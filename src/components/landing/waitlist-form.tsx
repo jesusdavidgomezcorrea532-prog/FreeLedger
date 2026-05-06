@@ -81,7 +81,7 @@ export function WaitlistForm({ variant = "hero" }: WaitlistFormProps) {
         required
         placeholder="you@freelance.com"
         autoComplete="email"
-        className="h-11 flex-1 border-zinc-800 bg-zinc-900/60 text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+        className="h-11 flex-1 border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
       />
       <SubmitButton variant={variant === "hero" ? "default" : "default"} />
     </form>

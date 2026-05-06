@@ -46,13 +46,13 @@ export function SignupForm() {
     return (
       <div className="rounded-md border border-emerald-500/20 bg-emerald-500/5 p-6 text-center">
         <CheckCircle2 className="mx-auto h-10 w-10 text-emerald-400" />
-        <h2 className="mt-4 text-lg font-semibold text-zinc-100">
+        <h2 className="mt-4 text-lg font-semibold text-zinc-900 dark:text-zinc-100">
           Confirm your email
         </h2>
-        <p className="mt-2 text-sm text-zinc-400">
+        <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
           We sent a confirmation link to{" "}
           {submittedEmail ? (
-            <span className="font-medium text-zinc-200">{submittedEmail}</span>
+            <span className="font-medium text-zinc-800 dark:text-zinc-200">{submittedEmail}</span>
           ) : (
             "your email"
           )}
@@ -72,7 +72,7 @@ export function SignupForm() {
       noValidate
     >
       <div className="space-y-2">
-        <Label htmlFor="name" className="text-zinc-300">
+        <Label htmlFor="name" className="text-zinc-700 dark:text-zinc-300">
           Name
         </Label>
         <Input
@@ -82,11 +82,11 @@ export function SignupForm() {
           autoComplete="name"
           required
           placeholder="Jane Doe"
-          className="h-11 border-zinc-800 bg-zinc-900/60 text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+          className="h-11 border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="email" className="text-zinc-300">
+        <Label htmlFor="email" className="text-zinc-700 dark:text-zinc-300">
           Email
         </Label>
         <Input
@@ -96,11 +96,11 @@ export function SignupForm() {
           autoComplete="email"
           required
           placeholder="you@freelance.com"
-          className="h-11 border-zinc-800 bg-zinc-900/60 text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+          className="h-11 border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="password" className="text-zinc-300">
+        <Label htmlFor="password" className="text-zinc-700 dark:text-zinc-300">
           Password
         </Label>
         <Input
@@ -111,11 +111,11 @@ export function SignupForm() {
           required
           minLength={8}
           placeholder="At least 8 characters"
-          className="h-11 border-zinc-800 bg-zinc-900/60 text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+          className="h-11 border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="confirmPassword" className="text-zinc-300">
+        <Label htmlFor="confirmPassword" className="text-zinc-700 dark:text-zinc-300">
           Confirm password
         </Label>
         <Input
@@ -126,7 +126,7 @@ export function SignupForm() {
           required
           minLength={8}
           placeholder="Repeat your password"
-          className="h-11 border-zinc-800 bg-zinc-900/60 text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+          className="h-11 border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
         />
       </div>
       <SubmitButton />

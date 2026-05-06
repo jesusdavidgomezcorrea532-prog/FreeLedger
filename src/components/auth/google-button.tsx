@@ -41,7 +41,7 @@ export function GoogleButton({
       variant="outline"
       onClick={handleClick}
       disabled={loading}
-      className="h-11 w-full border-zinc-800 bg-zinc-900/60 text-zinc-100 hover:border-zinc-700 hover:bg-zinc-900 hover:text-zinc-100"
+      className="h-11 w-full border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-900 dark:text-zinc-100 hover:border-zinc-700 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
     >
       {loading ? (
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

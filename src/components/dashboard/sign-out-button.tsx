@@ -15,7 +15,7 @@ export function SignOutButton() {
       size="sm"
       disabled={pending}
       onClick={() => startTransition(() => signOut())}
-      className="w-full justify-start text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100"
+      className="w-full justify-start text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-900 hover:text-zinc-900 dark:hover:text-zinc-100"
     >
       <LogOut className="mr-2 h-4 w-4" />
       {pending ? "Signing out..." : "Sign out"}

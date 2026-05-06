@@ -46,7 +46,7 @@ export function LoginForm({ next }: { next: string }) {
     <form action={formAction} className="space-y-4" noValidate>
       <input type="hidden" name="next" value={next} />
       <div className="space-y-2">
-        <Label htmlFor="email" className="text-zinc-300">
+        <Label htmlFor="email" className="text-zinc-700 dark:text-zinc-300">
           Email
         </Label>
         <Input
@@ -56,17 +56,17 @@ export function LoginForm({ next }: { next: string }) {
           autoComplete="email"
           required
           placeholder="you@freelance.com"
-          className="h-11 border-zinc-800 bg-zinc-900/60 text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+          className="h-11 border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
         />
       </div>
       <div className="space-y-2">
         <div className="flex items-center justify-between">
-          <Label htmlFor="password" className="text-zinc-300">
+          <Label htmlFor="password" className="text-zinc-700 dark:text-zinc-300">
             Password
           </Label>
           <Link
             href="#"
-            className="text-xs text-zinc-500 hover:text-zinc-300"
+            className="text-xs text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
             aria-disabled
           >
             Forgot password?
@@ -79,7 +79,7 @@ export function LoginForm({ next }: { next: string }) {
           autoComplete="current-password"
           required
           placeholder="••••••••"
-          className="h-11 border-zinc-800 bg-zinc-900/60 text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
+          className="h-11 border-zinc-300 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-900/60 text-zinc-900 dark:text-zinc-100 placeholder:text-zinc-500 focus-visible:border-emerald-500/50 focus-visible:ring-emerald-500/20"
         />
       </div>
       <SubmitButton />

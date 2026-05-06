@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const errorParam = params.error;
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-zinc-950 px-6 py-12">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-white dark:bg-zinc-950 px-6 py-12">
       <div className="w-full max-w-sm">
         <div className="flex justify-center">
           <Link href="/" aria-label="FreeLedger home">
@@ -23,12 +23,23 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
 
         <div className="mt-8 text-center">
-          <h1 className="text-2xl font-semibold tracking-tight text-zinc-100">
+          <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
             Welcome back
           </h1>
-          <p className="mt-2 text-sm text-zinc-400">
+          <p className="mt-2 text-sm text-zinc-600 dark:text-zinc-400">
             Sign in to your FreeLedger account.
           </p>
+        </div>
+
+        <div className="mt-6 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-center text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
+          FreeLedger is in pre-launch. Looking to join?{" "}
+          <Link
+            href="/#waitlist"
+            className="text-emerald-500 underline-offset-4 hover:underline dark:text-emerald-400"
+          >
+            Get on the waitlist
+          </Link>
+          .
         </div>
 
         {errorParam && (
@@ -41,8 +52,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <GoogleButton next={next} />
 
           <div className="relative">
-            <Separator className="bg-zinc-800" />
-            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-zinc-950 px-3 text-xs uppercase tracking-wider text-zinc-500">
+            <Separator className="bg-zinc-200 dark:bg-zinc-800" />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-zinc-950 px-3 text-xs uppercase tracking-wider text-zinc-500">
               or
             </span>
           </div>
@@ -50,13 +61,13 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           <LoginForm next={next} />
         </div>
 
-        <p className="mt-8 text-center text-sm text-zinc-400">
-          Don&apos;t have an account?{" "}
+        <p className="mt-8 text-center text-xs text-zinc-500">
+          Not on the team yet?{" "}
           <Link
-            href="/signup"
-            className="font-medium text-emerald-400 hover:text-emerald-300"
+            href="/#waitlist"
+            className="text-zinc-600 underline-offset-4 hover:text-emerald-400 hover:underline dark:text-zinc-400"
           >
-            Sign up
+            Join the waitlist
           </Link>
         </p>
       </div>

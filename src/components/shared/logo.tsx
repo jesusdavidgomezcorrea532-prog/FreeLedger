@@ -12,7 +12,7 @@ export function Logo({ className = "", showWordmark = true }: LogoProps) {
         <Wallet className="h-4 w-4 text-emerald-400" />
       </div>
       {showWordmark && (
-        <span className="text-base font-semibold tracking-tight text-zinc-100">
+        <span className="text-base font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">
           FreeLedger
         </span>
       )}

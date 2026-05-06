@@ -33,39 +33,62 @@ function GithubIcon({ className }: { className?: string }) {
 
 export function Footer() {
   return (
-    <footer className="border-t border-zinc-900 px-6 py-12">
-      <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 sm:flex-row">
-        <div className="flex flex-col items-center gap-2 sm:items-start">
-          <Logo />
-          <p className="text-xs text-zinc-500">
-            Built by{" "}
+    <footer className="border-t border-zinc-200 dark:border-zinc-900 px-6 py-12">
+      <div className="mx-auto flex max-w-6xl flex-col items-center gap-8 sm:items-stretch">
+        <div className="flex w-full flex-col items-center justify-between gap-6 sm:flex-row sm:items-start">
+          <div className="flex flex-col items-center gap-2 sm:items-start">
+            <Logo />
+            <p className="text-xs text-zinc-500">
+              Built by{" "}
+              <Link
+                href="https://jdaapps.dev"
+                className="text-zinc-700 dark:text-zinc-300 underline-offset-4 hover:text-emerald-400 hover:underline"
+              >
+                JDA! Apps
+              </Link>
+            </p>
+          </div>
+
+          <nav className="flex items-center gap-5 text-xs text-zinc-500">
             <Link
-              href="https://jdaapps.dev"
-              className="text-zinc-300 underline-offset-4 hover:text-emerald-400 hover:underline"
+              href="/privacy"
+              className="transition-colors hover:text-emerald-400"
             >
-              JDA! Apps
+              Privacy
             </Link>
-          </p>
+            <Link
+              href="/terms"
+              className="transition-colors hover:text-emerald-400"
+            >
+              Terms
+            </Link>
+            <Link
+              href="/login"
+              className="text-zinc-600 transition-colors hover:text-emerald-400 dark:text-zinc-600"
+            >
+              Admin login
+            </Link>
+          </nav>
+
+          <div className="flex items-center gap-5">
+            <Link
+              href="https://twitter.com/FreeLedgerApp"
+              aria-label="Twitter"
+              className="text-zinc-500 transition-colors hover:text-emerald-400"
+            >
+              <TwitterIcon className="h-4 w-4" />
+            </Link>
+            <Link
+              href="https://github.com/jesusdavidgomezcorrea532-prog/FreeLedger"
+              aria-label="GitHub"
+              className="text-zinc-500 transition-colors hover:text-emerald-400"
+            >
+              <GithubIcon className="h-4 w-4" />
+            </Link>
+          </div>
         </div>
 
-        <div className="flex items-center gap-5">
-          <Link
-            href="https://twitter.com/FreeLedgerApp"
-            aria-label="Twitter"
-            className="text-zinc-500 transition-colors hover:text-emerald-400"
-          >
-            <TwitterIcon className="h-4 w-4" />
-          </Link>
-          <Link
-            href="https://github.com/jesusdavidgomezcorrea532-prog/FreeLedger"
-            aria-label="GitHub"
-            className="text-zinc-500 transition-colors hover:text-emerald-400"
-          >
-            <GithubIcon className="h-4 w-4" />
-          </Link>
-        </div>
-
-        <p className="text-xs text-zinc-500">
+        <p className="text-center text-xs text-zinc-500 sm:text-left">
           &copy; 2026 FreeLedger. All rights reserved.
         </p>
       </div>
