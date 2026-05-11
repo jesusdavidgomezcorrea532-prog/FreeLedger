@@ -3,7 +3,9 @@ import { Button } from "@/components/ui/button";
 import { ProfileForm } from "@/components/settings/profile-form";
 import { FinancialForm } from "@/components/settings/financial-form";
 import { ExportCsvButton } from "@/components/settings/export-csv-button";
+import { PlanCard } from "@/components/settings/plan-card";
 import { getUserRecord } from "@/lib/actions/settings";
+import { getCurrentUserUsage } from "@/lib/actions/limits";
 import { createClient } from "@/lib/supabase/server";
 
 export const metadata = {
@@ -15,7 +17,10 @@ export default async function SettingsPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  const record = await getUserRecord();
+  const [record, usage] = await Promise.all([
+    getUserRecord(),
+    getCurrentUserUsage(),
+  ]);
 
   const displayName =
     record?.display_name ??
@@ -23,6 +28,10 @@ export default async function SettingsPage() {
     user?.email ??
     "";
   const email = record?.email ?? user?.email ?? "";
+
+  const plan = usage?.plan ?? "free";
+  const clients = usage?.clients ?? 0;
+  const transactionsThisMonth = usage?.transactionsThisMonth ?? 0;
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-6 sm:px-6 sm:py-8">
@@ -63,24 +72,18 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
+      <PlanCard
+        plan={plan}
+        clients={clients}
+        transactionsThisMonth={transactionsThisMonth}
+      />
+
       <Card className="border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-950">
         <CardHeader>
           <CardTitle>Account</CardTitle>
-          <CardDescription>Plan, data, and danger zone.</CardDescription>
+          <CardDescription>Data and danger zone.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-5 pb-4">
-          <div className="flex items-center justify-between rounded-lg border border-zinc-200 dark:border-zinc-900 bg-white/60 dark:bg-zinc-950/60 p-3">
-            <div>
-              <p className="text-sm text-zinc-800 dark:text-zinc-200">Current plan</p>
-              <p className="text-xs text-zinc-500">
-                You're on the Free plan. Upgrade coming soon.
-              </p>
-            </div>
-            <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs text-emerald-300 ring-1 ring-emerald-500/30">
-              {record?.plan ?? "free"}
-            </span>
-          </div>
-
           <div className="flex items-center justify-between rounded-lg border border-zinc-200 dark:border-zinc-900 bg-white/60 dark:bg-zinc-950/60 p-3">
             <div>
               <p className="text-sm text-zinc-800 dark:text-zinc-200">Export data</p>

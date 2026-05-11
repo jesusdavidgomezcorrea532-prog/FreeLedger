@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown, ChevronUp, Pencil, Plus, Search, Trash2, TrendingUp, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,11 +17,14 @@ import {
 import { MonthPicker } from "@/components/dashboard/month-picker";
 import { IncomeFormDialog } from "@/components/income/income-form-dialog";
 import { DeleteConfirmDialog } from "@/components/clients/delete-confirm-dialog";
+import { UsageMeter } from "@/components/shared/usage-meter";
+import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
 import { deleteIncomeAction } from "@/lib/actions/income";
 import { formatCurrency, getPaymentMethodLabel } from "@/lib/constants";
 import { formatDateShort } from "@/lib/dates";
 import { useDebouncedValue } from "@/lib/hooks/use-debounced-value";
 import { cn } from "@/lib/utils";
+import type { PlanType } from "@/lib/plans";
 import type { ClientRecord, IncomeWithClient } from "@/types";
 
 type Mode =
@@ -46,6 +50,9 @@ type IncomePageClientProps = {
   initialSort: SortColumn;
   initialDir: SortDir;
   initialAction: string | null;
+  plan: PlanType;
+  transactionsThisMonth: number;
+  transactionLimit: number;
 };
 
 export function IncomePageClient({
@@ -61,15 +68,59 @@ export function IncomePageClient({
   initialSort,
   initialDir,
   initialAction,
+  plan,
+  transactionsThisMonth,
+  transactionLimit,
 }: IncomePageClientProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const isFree = plan === "free";
+  const showMeter = isFree && Number.isFinite(transactionLimit);
+  const limitReached = isFree && transactionsThisMonth >= transactionLimit;
+  const noClients = clients.length === 0;
+
   const [mode, setMode] = useState<Mode>(
-    initialAction === "new" && clients.length > 0 ? { kind: "create" } : { kind: "closed" },
+    initialAction === "new" && !noClients && !limitReached
+      ? { kind: "create" }
+      : { kind: "closed" },
   );
+  const [showPaywall, setShowPaywall] = useState(false);
   const close = () => setMode({ kind: "closed" });
+
+  const handleAdd = () => {
+    if (limitReached) {
+      setShowPaywall(true);
+      return;
+    }
+    setMode({ kind: "create" });
+  };
+
+  const prevTransactionsRef = useRef<number>(transactionsThisMonth);
+  useEffect(() => {
+    const prev = prevTransactionsRef.current;
+    if (
+      isFree &&
+      Number.isFinite(transactionLimit) &&
+      transactionsThisMonth > prev &&
+      transactionsThisMonth >= Math.ceil(transactionLimit * 0.8) &&
+      transactionsThisMonth < transactionLimit &&
+      prev < Math.ceil(transactionLimit * 0.8)
+    ) {
+      toast.warning(
+        `You've used ${transactionsThisMonth} of ${transactionLimit} transactions this month. Consider upgrading to Pro.`,
+      );
+    }
+    prevTransactionsRef.current = transactionsThisMonth;
+  }, [transactionsThisMonth, isFree, transactionLimit]);
+
+  const addDisabled = noClients || limitReached;
+  const addTitle = limitReached
+    ? "Limit reached — Upgrade to Pro"
+    : noClients
+      ? "Add a client first"
+      : undefined;
 
   const [clientFilter, setClientFilter] = useState<string>(initialClientId ?? "all");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>(initialStatus);
@@ -184,14 +235,23 @@ export function IncomePageClient({
           <Button
             type="button"
             data-shortcut-new
-            onClick={() => setMode({ kind: "create" })}
-            disabled={clients.length === 0}
+            onClick={handleAdd}
+            disabled={addDisabled}
+            title={addTitle}
             className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
           >
             <Plus className="mr-1 h-4 w-4" /> Add income
           </Button>
         </div>
       </div>
+
+      {showMeter && (
+        <UsageMeter
+          label="transactions this month"
+          current={transactionsThisMonth}
+          limit={transactionLimit}
+        />
+      )}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Card className="border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-950">
@@ -219,7 +279,7 @@ export function IncomePageClient({
       {clients.length === 0 ? (
         <NoClientsState />
       ) : income.length === 0 ? (
-        <EmptyState onAdd={() => setMode({ kind: "create" })} />
+        <EmptyState onAdd={handleAdd} disabled={limitReached} />
       ) : (
         <div className="space-y-3">
           <FilterBar
@@ -371,6 +431,12 @@ export function IncomePageClient({
           return deleteIncomeAction(mode.income.id);
         }}
       />
+
+      <UpgradePrompt
+        open={showPaywall}
+        onOpenChange={setShowPaywall}
+        kind="transactions"
+      />
     </div>
   );
 }
@@ -489,7 +555,13 @@ function FilterBar({
   );
 }
 
-function EmptyState({ onAdd }: { onAdd: () => void }) {
+function EmptyState({
+  onAdd,
+  disabled = false,
+}: {
+  onAdd: () => void;
+  disabled?: boolean;
+}) {
   return (
     <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-zinc-950/40 px-6 py-16 text-center">
       <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/30">
@@ -499,11 +571,15 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
         No income recorded this month
       </h2>
       <p className="mt-1 max-w-sm text-sm text-zinc-500">
-        Add your first payment to start tracking.
+        {disabled
+          ? "You've reached this month's transaction limit."
+          : "Add your first payment to start tracking."}
       </p>
       <Button
         type="button"
         onClick={onAdd}
+        disabled={disabled}
+        title={disabled ? "Limit reached — Upgrade to Pro" : undefined}
         className="mt-5 bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
       >
         <Plus className="mr-1 h-4 w-4" /> Add income

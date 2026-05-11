@@ -7,6 +7,8 @@ import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { KeyboardShortcuts } from "@/components/dashboard/keyboard-shortcuts";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_COUNTRY } from "@/lib/constants";
+import { normalizePlan, PLANS } from "@/lib/plans";
+import { cn } from "@/lib/utils";
 
 export default async function DashboardSectionLayout({
   children,
@@ -25,7 +27,7 @@ export default async function DashboardSectionLayout({
   const [{ data: userRow }, { count: clientCount }] = await Promise.all([
     supabase
       .from("users")
-      .select("country, display_name, avatar_url, email")
+      .select("country, display_name, avatar_url, email, plan")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -36,6 +38,14 @@ export default async function DashboardSectionLayout({
 
   const country = userRow?.country ?? DEFAULT_COUNTRY;
   const onboardingComplete = country !== DEFAULT_COUNTRY || (clientCount ?? 0) > 0;
+  const plan = normalizePlan(userRow?.plan as string | null | undefined);
+  const planLabel = PLANS[plan].name;
+  const planBadgeClass = cn(
+    "inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium",
+    plan === "free"
+      ? "bg-zinc-200 text-zinc-700 ring-1 ring-zinc-300 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700"
+      : "bg-emerald-500/10 text-emerald-300 ring-1 ring-emerald-500/30",
+  );
 
   if (!onboardingComplete) {
     redirect("/onboarding");
@@ -59,11 +69,16 @@ export default async function DashboardSectionLayout({
           <ThemeToggle size="sm" />
         </div>
         <div className="mt-8 flex-1">
-          <SidebarNav />
+          <SidebarNav plan={plan} />
         </div>
         <div className="mt-auto space-y-3 border-t border-zinc-200 pt-4 dark:border-zinc-900">
           <div className="px-2 text-xs">
-            <p className="truncate text-zinc-700 dark:text-zinc-200">{displayName}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="truncate text-zinc-700 dark:text-zinc-200">
+                {displayName}
+              </p>
+              <span className={planBadgeClass}>{planLabel}</span>
+            </div>
             <p className="truncate text-zinc-500">{email}</p>
           </div>
           <SignOutButton />
@@ -74,7 +89,7 @@ export default async function DashboardSectionLayout({
           <Logo />
           <div className="flex items-center gap-2">
             <ThemeToggle size="sm" />
-            <MobileNav displayName={displayName} email={email} />
+            <MobileNav displayName={displayName} email={email} plan={plan} />
           </div>
         </header>
         <main className="flex-1">{children}</main>

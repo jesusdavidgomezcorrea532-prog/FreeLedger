@@ -1,6 +1,6 @@
 # FreeLedger — Estado del proyecto
 
-> Snapshot al 5 de mayo de 2026 (fin del Día 7 — Polish, SEO, legal, landing redesign, loading/error states).
+> Snapshot al 11 de mayo de 2026 (fin del Día 9 — Activación real de pagos LemonSqueezy: webhook firmado, checkout server-side, botones cableados).
 > Stack: Next.js 16.2.4 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 · shadcn/ui · Supabase · Recharts · Sonner · lucide-react · next-themes.
 
 ---
@@ -541,9 +541,12 @@ Sin esto, `getClients`, `getMonthlyIncome` y `getMonthlyExpenses` devolverán `[
 
 ---
 
-## 🗺️ Después del Día 6 — siguientes hitos
+## 🗺️ Después del Día 8 — siguientes hitos
 
-- **Día 7 — Pulido y deploy a producción** (favicon, OG image, robots/sitemap, smoke tests, monitoring, plan paywall, posiblemente date range filter en lugar/además de month picker).
+- **Activar pagos reales con LemonSqueezy** cuando se decida lanzar (rellenar variant IDs, implementar verificación de firma, conectar checkout en `UpgradeCtaButton`). Estructura ya lista — solo falta el cableado real.
+- **Bloquear CSV export para Free** post-launch (cambiar `PLANS.free.canExportCSV = false` y agregar guard en los 3 Route Handlers de `/api/export/*`).
+- **Métricas / analytics** sobre clicks en banner, paywall y página `/dashboard/upgrade` para optimizar el funnel free→pro.
+- **Día 7 (referencia histórica) — Pulido y deploy a producción** (favicon, OG image, robots/sitemap, smoke tests, monitoring, plan paywall, posiblemente date range filter en lugar/además de month picker).
 - **Mejoras opcionales pendientes de Día 6**:
   - Range de fechas en filtros (hoy el filtro por mes lo hace el `MonthPicker`; añadir un date-range picker permitiría queries multi-mes).
   - Multi-select para categorías en expenses (hoy es single-select).
@@ -640,13 +643,387 @@ Sin esto, `getClients`, `getMonthlyIncome` y `getMonthlyExpenses` devolverán `[
 
 ---
 
+## ✅ Día 8 — Free tier limits + paywall + estructura LemonSqueezy (10 mayo 2026)
+
+### Lo que se hizo
+
+**Configuración de planes**
+- `src/lib/plans.ts` — fuente de verdad de `PLANS` con `free`, `pro` y `lifetime`. Cada plan declara `name`, `maxClients`, `maxTransactionsPerMonth`, `canExportCSV`, `price`. Pro y Lifetime usan `Infinity` en los maxes. Helpers `isPlanType` / `normalizePlan(value)` para narrowing seguro desde la DB.
+- `UserPlan` en `src/types/index.ts` actualizado a `"free" | "pro" | "lifetime"`.
+- **Decisión**: `canExportCSV` está en `true` para Free **temporalmente** (testing pre-launch). Cambiar a `false` post-launch — todavía no hay enforcement del export en server porque el dueño necesita hacer pruebas desde su cuenta.
+
+**Verificación de límites (Server Actions)**
+- `src/lib/actions/limits.ts` con tres funciones públicas:
+  - `canCreateClient(userId): { allowed, current, limit }` — cuenta clientes del usuario y compara con `PLANS[plan].maxClients`.
+  - `canCreateTransaction(userId): { allowed, current, limit }` — cuenta `income` + `expenses` del **mes actual UTC** (usa `currentMonthRange()`) y compara con `PLANS[plan].maxTransactionsPerMonth`. Income y expenses comparten el contador.
+  - `getUsage(userId): { clients, transactionsThisMonth, plan }` — agregada para SSR de banners/cards.
+  - `getCurrentUserUsage()` — wrapper que resuelve el `userId` desde `supabase.auth.getUser()`. Devuelve `null` si no hay sesión.
+- Los counts usan `select("id", { count: "exact", head: true })` para evitar traer rows.
+- Plan se lee siempre desde `users.plan` (con fallback a `"free"` vía `normalizePlan`) — fuente de verdad única, no se confía en cookies/sessionClaims.
+
+**Enforcement en server**
+- `createClientAction` (en `clients.ts`): antes del `insert`, llama `canCreateClient(user.id)`. Si `!allowed` devuelve `{ success: false, error: "You've reached the limit of 3 clients on the Free plan. Upgrade to Pro for unlimited clients." }`.
+- `createIncomeAction` y `createExpenseAction`: misma lógica con `canCreateTransaction`. Mensaje: `"You've reached 30 transactions this month on the Free plan. Upgrade to Pro for unlimited transactions."`
+- Las funciones `update*Action` **no** chequean límites (editar no incrementa el conteo) — intencional.
+- El error vuelve por el `ActionResult` y se muestra como toast rojo en el cliente vía Sonner.
+
+**UI: indicador de uso (UsageMeter)**
+- `src/components/shared/usage-meter.tsx` — server-friendly (sin `"use client"`), recibe `label`, `current`, `limit`. Renderiza:
+  - Texto `<current> of <limit> <label>` con tabular-nums.
+  - Link "Upgrade" a `/dashboard/upgrade`.
+  - Mini barra con tono dinámico: emerald si <80%, amber si ≥80%, red si ≥100%.
+  - Si `limit === Infinity` retorna `null` (no se muestra para Pro/Lifetime).
+- Renderizado debajo del header en `/dashboard/clients`, `/dashboard/income`, `/dashboard/expenses`. Solo visible cuando `plan === "free"`.
+
+**UI: límite alcanzado**
+- Botones "Add client", "Add income", "Add expense" se deshabilitan visualmente cuando `transactionsThisMonth >= limit` (o `clients.length >= limit`). Tooltip via `title`: `"Limit reached — Upgrade to Pro"`.
+- Al click se abre el `UpgradePrompt` en lugar del form dialog.
+- Los `EmptyState` de income/expenses ahora también respetan `disabled` y cambian su copy a `"You've reached this month's transaction limit."` cuando aplica.
+
+**UI: UpgradePrompt (paywall dialog)**
+- `src/components/shared/upgrade-prompt.tsx` — Dialog reusable con dos `kind`s: `"clients"` o `"transactions"` (cambia el subtítulo).
+- Card con borde emerald, icono Sparkles, lista de features de Pro (Unlimited clients, Unlimited transactions, CSV export, Email reports coming soon), botón principal `"Upgrade to Pro — $9/mo"` → `/dashboard/upgrade`, botón secundario `"Maybe later"` → cierra.
+- Implementado como `<Link>` estilizado en lugar de `Button asChild` porque el `Button` del repo (base-ui/react) no soporta `asChild` — usa el patrón `render={...}`.
+
+**Página de upgrade (`/dashboard/upgrade`)**
+- `src/app/(dashboard)/dashboard/upgrade/page.tsx` — Server Component que lee `getCurrentUserUsage()` para detectar el plan actual y mostrar el badge "Current plan" en la card correspondiente.
+- 3 cards comparativas en grid (1 col mobile → 3 col lg):
+  - **Free**: 3 clients, 30 transactions/month, Basic dashboard. CTA disabled "Current plan" (o gris si ya estás en otro plan).
+  - **Pro** (highlighted con borde emerald + ring + sombra emerald): Unlimited clients/transactions, CSV export, Advanced filters, Email reports. Precio "$9/month or $79/year (save 27%)". Badge "Most popular". CTA "Upgrade to Pro" → toast info.
+  - **Lifetime**: Everything in Pro, forever. "$69 one-time · only first 200 customers". CTA "Get Lifetime" → toast info.
+- Header centrado con badge "Upgrade", titular y copy explicando la diferencia entre planes.
+- `src/components/upgrade/upgrade-cta-button.tsx` — wrapper client component que dispara `toast.info("Payments are coming soon! You'll be notified when Pro is available.")`. Reutilizado por Pro y Lifetime.
+
+**Plan card en Settings**
+- `src/components/settings/plan-card.tsx` — nuevo bloque "Your plan" en `/dashboard/settings` con badge del plan actual (gris para Free, emerald para Pro/Lifetime).
+- Dos progress rows: "Clients" y "Transactions this month" — cada una muestra `current / limit` (o `current / unlimited` para Pro/Lifetime) + barra con el mismo tono dinámico que el `UsageMeter`.
+- Botón "Upgrade to Pro" embebido en la card si `plan === "free"`.
+- El bloque "Current plan" placeholder de Día 4 fue **reemplazado** por esta card. La card "Account" remanente conserva Export CSV + Danger Zone.
+
+**Banner de upgrade en Dashboard**
+- `src/components/dashboard/upgrade-banner.tsx` — banner sutil con borde emerald + icono Sparkles arriba del dashboard. Solo se renderiza si `plan === "free"` y si no fue dismissed en los últimos 7 días.
+- Persistencia de dismiss: `localStorage["freeledger:upgrade-banner-dismissed-at"]` con timestamp en ms. Re-aparece automáticamente después de 7 días.
+- Botón X cierra el banner sin re-aparecer hasta vencimiento.
+- Lleva el patrón `eslint-disable-next-line react-hooks/set-state-in-effect` igual que `animate-on-scroll` (justificado: el setState es para el patrón mounted-safe que evita hydration mismatch).
+
+**Sidebar: badge de plan + link a Upgrade**
+- `dashboard/layout.tsx` ahora también lee `users.plan` en la query del usuario. Calcula `planLabel` y `planBadgeClass` y muestra el badge al lado del display name (sidebar desktop + mobile sheet).
+- `SidebarNav` actualizado: acepta prop `plan`. Si `plan === "free"`, agrega un nav item extra **debajo** de los 5 normales: icono Sparkles, label "Upgrade", badge "New" emerald al final, color emerald (más prominente que los grises de los otros). Se hace active cuando la ruta es `/dashboard/upgrade`.
+- `MobileNav` actualizado: forwarda `plan` al `SidebarNav` y muestra el mismo badge al lado del nombre.
+
+**Toast al 80% del límite mensual**
+- `IncomePageClient` y `ExpensesPageClient` usan un `useRef` que guarda el `transactionsThisMonth` previo. Cuando el valor *aumenta* y cruza el umbral `Math.ceil(limit * 0.8)` (24 en Free) **sin todavía alcanzar el límite**, dispara `toast.warning("You've used 24 of 30 transactions this month. Consider upgrading to Pro.")`.
+- La detección de "cruzó el umbral" compara prev < 24 && current ≥ 24, así no re-fira en cada render entre 24 y 29.
+- No se dispara al alcanzar el límite (30) — en ese punto el server ya rechaza nuevas transacciones y el flujo de UI cambia al UpgradePrompt.
+
+**Estructura LemonSqueezy (placeholder)**
+- `src/lib/lemonsqueezy.ts` — interface `LemonSqueezyWebhookEvent` (meta + data + attributes) y constante `LEMON_VARIANTS = { pro_monthly: 0, pro_yearly: 0, lifetime: 0 }`. Los `0` son placeholders — hay que rellenarlos con los variant IDs reales antes de activar pagos.
+- `src/app/api/webhooks/lemonsqueezy/route.ts` — POST handler con TODOs claros:
+  1. Verificar firma `X-Signature` con HMAC SHA256 + `LEMON_SQUEEZY_WEBHOOK_SECRET`.
+  2. Parsear body como `LemonSqueezyWebhookEvent`.
+  3. Switch sobre `meta.event_name`:
+     - `subscription_created` / `subscription_updated` → `users.plan = 'pro'`.
+     - `subscription_cancelled` / `subscription_expired` → `users.plan = 'free'`.
+     - `order_created` con `variant_id === LEMON_VARIANTS.lifetime` → `users.plan = 'lifetime'`.
+  4. Persistir `customer_id` / `variant_id` en el user row para futuros portal/refund flows.
+- Por ahora retorna `200 { received: true }` — suficiente para que LemonSqueezy no marque el endpoint como fallido durante setup.
+- `.env.example` actualizado con `LEMON_SQUEEZY_API_KEY`, `LEMON_SQUEEZY_WEBHOOK_SECRET`, `LEMON_SQUEEZY_STORE_ID`.
+
+### Rutas tras Día 8
+
+```
+/                              landing — sticky nav + hero + problem + features + pricing + waitlist + footer
+/login, /signup                auth
+/auth/callback                 OAuth code exchange
+/onboarding                    wizard de 3 pasos
+/dashboard                     Real Money Dashboard (con UpgradeBanner si Free)
+/dashboard/income              CRUD income (con UsageMeter + UpgradePrompt + 80% toast)
+/dashboard/expenses            CRUD expenses (con UsageMeter + UpgradePrompt + 80% toast)
+/dashboard/clients             CRUD clients (con UsageMeter + UpgradePrompt)
+/dashboard/settings            perfil + financiero + Plan card + export CSV + danger zone
+/dashboard/upgrade             3 tiers comparativos (Free/Pro/Lifetime), CTAs con toast "coming soon"
+/api/export/{income,expenses,all}      CSV exports
+/api/webhooks/lemonsqueezy     POST placeholder con TODOs (retorna 200)
+/privacy, /terms               legal
+/robots.txt, /sitemap.xml      generados
+/opengraph-image, /twitter-image, /icon, /apple-icon    edge dynamic
+```
+
+### Estructura nueva (Día 8)
+
+```
+src/
+├── app/
+│   ├── (dashboard)/dashboard/
+│   │   └── upgrade/page.tsx                    — página de upgrade con 3 tiers
+│   └── api/webhooks/
+│       └── lemonsqueezy/route.ts               — webhook placeholder
+├── components/
+│   ├── dashboard/
+│   │   └── upgrade-banner.tsx                  — banner free-tier dismissable 7 días
+│   ├── settings/
+│   │   └── plan-card.tsx                       — bloque "Your plan" con progress bars
+│   ├── shared/
+│   │   ├── usage-meter.tsx                     — barra reusable verde/amber/red
+│   │   └── upgrade-prompt.tsx                  — dialog paywall (kind: clients | transactions)
+│   └── upgrade/
+│       └── upgrade-cta-button.tsx              — botón "coming soon" con toast info
+└── lib/
+    ├── plans.ts                                — PLANS config + helpers de PlanType
+    ├── lemonsqueezy.ts                         — types + LEMON_VARIANTS placeholders
+    └── actions/
+        └── limits.ts                           — canCreateClient/canCreateTransaction/getUsage
+```
+
+### Calidad
+
+- `npx tsc --noEmit` → ✅ limpio.
+- `next build` → ✅ limpio, **24 rutas**, 0 errores (las 22 de Día 7 + `/dashboard/upgrade` + `/api/webhooks/lemonsqueezy`).
+- `npm run lint`: los **2 errores pre-existentes** que ya estaban en Día 7 (`problem.tsx` apostrophe, `animate-on-scroll` setState-in-effect). No se introdujeron errores nuevos. El `setState` en `upgrade-banner.tsx` lleva `eslint-disable-next-line react-hooks/set-state-in-effect` con el mismo patrón mounted-safe documentado.
+
+### Decisiones / consideraciones
+
+- **CSV export sigue habilitado en Free** — `PLANS.free.canExportCSV = true`. El bloqueo se hará post-launch; necesario para que el dueño pruebe desde su propia cuenta. Cuando se active, el guard debe ir en los 3 Route Handlers de `/api/export/*` (verificar `getUserPlan(user.id)` antes de servir el CSV).
+- **Income + expenses comparten el contador mensual de 30**. No es 30 income + 30 expenses. Esto es deliberado y coherente con el copy ("30 transactions/month" en la página de upgrade).
+- **El plan se lee siempre desde `users.plan` con `normalizePlan()`** — si el value es inválido o null, cae a `"free"`. Esto cubre el período pre-launch en que la columna podría estar vacía.
+- **Server-side first**: aunque el botón está disabled en UI, el server siempre re-verifica. No es posible saltarse el límite editando devtools.
+- **Update no consume cuota**: solo el create. Editar un income existente no incrementa `transactionsThisMonth` (ni en cliente ni en server).
+
+### Pasos manuales pendientes (post-Día 8)
+
+1. **Validar columna `users.plan` en Supabase**: si tiene CHECK constraint que solo permite `'free'` o `'pro'`, hay que ampliarlo para aceptar `'lifetime'`. Ejecutar:
+   ```sql
+   ALTER TABLE users DROP CONSTRAINT IF EXISTS users_plan_check;
+   ALTER TABLE users ADD CONSTRAINT users_plan_check CHECK (plan IN ('free', 'pro', 'lifetime'));
+   ```
+   Si no hay CHECK (columna libre TEXT), no se requiere acción.
+2. **Cuando se active LemonSqueezy** — ✅ **resuelto en Día 9** (ver sección Día 9 más abajo). Pendiente del owner: ejecutar el SQL del paso 1, llenar `SUPABASE_SERVICE_ROLE_KEY` en Vercel, y hacer un checkout de prueba en test mode.
+3. **Bloquear CSV export post-launch**: cuando se decida cerrar el feature para Free, agregar `if (!PLANS[plan].canExportCSV) return new Response('Upgrade required', { status: 402 })` al inicio de los 3 GETs de `/api/export/*`. Y poner `PLANS.free.canExportCSV = false`.
+
+---
+
+## 🧪 Cómo probar Día 8 localmente
+
+`npm run dev` → http://localhost:3000 → loguearse y entrar a `/dashboard`. Asume usuario con `plan = 'free'` en la DB (default).
+
+### Límite de clientes (3 en Free)
+1. Ir a `/dashboard/clients`. Confirmar que aparece el `UsageMeter`: "0 of 3 clients" con barra emerald.
+2. Crear 3 clientes. Tras el 3ro la barra está al 100% en rojo.
+3. El botón "Add client" aparece deshabilitado con tooltip nativo "Limit reached — Upgrade to Pro".
+4. Click en el botón (igual no abre el dialog porque está disabled). Si se simula click programático, abre el `UpgradePrompt`.
+5. **Server-side**: en Network → forzar el form action a través del existente form (e.g. dejar el dialog abierto desde antes de llegar al límite): el server devuelve toast rojo con el mensaje del límite. Inserción rechazada.
+
+### Límite de transacciones (30/mes en Free)
+1. Ir a `/dashboard/income`. Confirmar `UsageMeter` "X of 30 transactions this month".
+2. Crear income+expenses combinados hasta 23 → la barra pasa de emerald a amber al cruzar 24.
+3. **Toast 80%**: al crear la transacción #24, después del `revalidatePath` debe aparecer el toast warning: "You've used 24 of 30 transactions this month. Consider upgrading to Pro." Crear la #25-#29 NO repite el toast (solo cruzar el umbral lo dispara).
+4. Al llegar a 30: barra roja, botones disabled, click abre `UpgradePrompt`.
+5. **Server-side**: el create #31 retorna toast de error desde el server.
+
+### Página /dashboard/upgrade
+1. Sidebar (mientras `plan === "free"`) tiene un nav item "Upgrade" con icono Sparkles + badge "New" emerald al final de la lista.
+2. Click → llega a `/dashboard/upgrade`. Layout: header centrado con badge, 3 cards en grid (1 col mobile, 3 col lg).
+3. La card del plan actual ("Free" si recién señalado en DB) tiene badge "Current plan" arriba y CTA disabled "Current plan".
+4. Pro card tiene borde emerald, ring, sombra y badge "Most popular". Lifetime con CTA outline.
+5. Click en "Upgrade to Pro — $9/mo" o "Get Lifetime $69" → toast info: "Payments are coming soon! You'll be notified when Pro is available."
+
+### Settings — Plan card
+1. `/dashboard/settings` → debajo de Financial aparece la card "Your plan" con badge gris "Free".
+2. Dos progress rows visibles: "Clients" (X / 3) y "Transactions this month" (Y / 30) con barras de color dinámico.
+3. Botón "Upgrade to Pro" → `/dashboard/upgrade`.
+4. Si manualmente se cambia `users.plan = 'pro'` en Supabase y se recarga: el badge se vuelve emerald "Pro", los rows muestran "X / unlimited" con barras emerald llenas, y el botón Upgrade desaparece.
+
+### Banner de upgrade en Dashboard
+1. `/dashboard` → arriba de todo (después del empty state si aplica) aparece banner emerald sutil: "You're on the Free plan. Upgrade to Pro for unlimited tracking. [Upgrade →]".
+2. Click en X → desaparece. `localStorage.freeledger:upgrade-banner-dismissed-at` queda con un timestamp.
+3. Recargar la página → banner sigue oculto.
+4. **Test de re-aparición**: en devtools, eliminar la key del localStorage (o setear un timestamp viejo manualmente: `localStorage.setItem("freeledger:upgrade-banner-dismissed-at", "0")`). Recargar → vuelve a aparecer.
+5. Cambiar `users.plan = 'pro'` en DB → banner deja de renderizarse aunque el localStorage no tenga dismiss.
+
+### Sidebar badge de plan
+1. Plan Free → badge gris "Free" al lado del display name (sidebar desktop + mobile sheet).
+2. Cambiar a Pro o Lifetime en DB → badge se vuelve emerald con el nombre del plan, y el nav item "Upgrade" desaparece del sidebar.
+
+### Webhook placeholder
+1. `curl -X POST http://localhost:3000/api/webhooks/lemonsqueezy -d '{}'` → `{ "received": true }` con 200. (Sin verificación de firma todavía — eso es TODO.)
+
+### UpgradePrompt directo
+1. Estando en Income/Expenses con limit reached, click en cualquier botón Add → se abre el dialog paywall.
+2. Verificar copy correcto según `kind`: "Upgrade to Pro for unlimited transactions" en income/expenses, "Upgrade to Pro for unlimited clients" en clients.
+3. Lista de 4 features con checks emerald.
+4. "Maybe later" cierra el dialog. "Upgrade to Pro — $9/mo" navega a `/dashboard/upgrade`.
+
+---
+
+## ✅ Día 9 — Activación real de pagos LemonSqueezy (11 mayo 2026)
+
+### Lo que se hizo
+
+**Datos reales de LemonSqueezy cableados**
+- `src/lib/lemonsqueezy.ts` — reemplazados los placeholders por los IDs reales:
+  - `LEMON_STORE_ID = 366692`.
+  - `LEMON_VARIANTS = { pro_monthly: 1634640, lifetime: 1634662 }`. Se eliminó `pro_yearly` (no hay producto yearly).
+  - `LemonSqueezyWebhookEvent.data.attributes` extendido con `first_order_item?: { variant_id }` (campo que aparece en eventos `order_created` con line items).
+- Nueva función `getCheckoutUrl(variantId, userId, userEmail)`: construye la URL del LemonSqueezy hosted checkout en `https://freeledger.lemonsqueezy.com/buy/<variantId>` con `checkout[custom][user_id]`, `checkout[email]` y `checkout[success_url]=https://freeledger.dev/dashboard?upgraded=true` (URL-encoded vía `URLSearchParams`).
+
+**Webhook handler completo**
+- `src/app/api/webhooks/lemonsqueezy/route.ts` — reemplaza el placeholder de Día 8. Flujo:
+  1. `runtime = "nodejs"` (necesario para `crypto` y para el cliente service-role).
+  2. Lee el body con `request.text()` (no `request.json()` — la firma se calcula sobre el raw body) y el header `x-signature`.
+  3. `verifySignature(payload, signature, secret)` calcula HMAC SHA256 hex del raw body con `LEMON_SQUEEZY_WEBHOOK_SECRET` y compara con `crypto.timingSafeEqual` sobre `Buffer.from(..., "hex")`. **Antes** del `timingSafeEqual` se compara `signatureBuf.length !== digestBuf.length` y se retorna `false` para evitar el throw que tira `timingSafeEqual` cuando los buffers difieren en longitud (importante porque un atacante podría mandar una firma corta y crashear el handler).
+  4. Si la firma no valida → `401 { error: "Invalid signature" }`. Si no viene `user_id` en `custom_data` → `400`.
+  5. Switch sobre `meta.event_name`:
+     - `subscription_created` / `subscription_updated` con `status ∈ {"active", "on_trial"}` → `users.plan = 'pro'`.
+     - `subscription_cancelled` / `subscription_expired` → `users.plan = 'free'`.
+     - `order_created` con `variant_id === LEMON_VARIANTS.lifetime` (1634662) → `users.plan = 'lifetime'`. Lee tanto `attributes.first_order_item.variant_id` como `attributes.variant_id` (LS varía el shape según el evento).
+  6. Errores se loggean y devuelven `500 { error: "Webhook processing failed" }`.
+- El cliente Supabase para el webhook se crea con `createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)` (no la anon key) para poder hacer `update` sobre `users` sin sesión autenticada. El service role bypassa RLS — por eso vive **solo** en este Route Handler y nunca cruza al cliente.
+
+**Checkout API**
+- Nuevo `src/app/api/checkout/route.ts` — Route Handler `GET` server-side:
+  1. `supabase.auth.getUser()`. Si no hay sesión → redirige a `/login?next=/dashboard/upgrade` (en vez de devolver 401, mejor UX si el botón se clicketea con la sesión expirada).
+  2. Lee `?plan=pro_monthly` o `?plan=lifetime` con type guard `isLemonVariant`. Plan inválido → `400`.
+  3. Llama `getCheckoutUrl(LEMON_VARIANTS[plan], user.id, user.email)` y hace `NextResponse.redirect(checkoutUrl)`.
+- Resultado: los botones de upgrade pueden ser un simple `<a href="/api/checkout?plan=...">` y el servidor inyecta el `user_id` correcto en el custom_data sin que el cliente lo manipule.
+
+**UpgradeCtaButton cableado al checkout real**
+- `src/components/upgrade/upgrade-cta-button.tsx` — rediseñado:
+  - Nueva prop obligatoria `plan: "pro_monthly" | "lifetime"`.
+  - Click ejecuta `window.location.href = '/api/checkout?plan=<plan>'` envuelto en `useTransition` + flag `hasRedirected` para mostrar estado loading.
+  - Mientras redirige: spinner `Loader2 animate-spin` + label "Redirecting…" y `disabled` para evitar dobles clicks.
+  - Si la asignación a `window.location` lanza, se resetea el estado y se muestra `toast.error("Could not start checkout. Please try again.")`.
+
+**Upgrade page con CTAs en vivo**
+- `src/app/(dashboard)/dashboard/upgrade/page.tsx`:
+  - `Tier` ahora declara `checkoutPlan?: "pro_monthly" | "lifetime"`.
+  - Tier Pro: label `"Upgrade to Pro — $9/mo"`, `checkoutPlan: "pro_monthly"`.
+  - Tier Lifetime: label `"Get Lifetime $69"`, `checkoutPlan: "lifetime"`.
+  - Los `<UpgradeCtaButton>` reciben el `plan` y solo se renderizan si el tier tiene `checkoutPlan` definido — guarda contra mostrar un botón "primario" sin destino.
+  - El botón del tier Free sigue siendo "Current plan" disabled cuando aplica.
+
+**UpgradePrompt apunta directo al checkout**
+- `src/components/shared/upgrade-prompt.tsx` — el link "Upgrade to Pro — $9/mo" ahora apunta a `/api/checkout?plan=pro_monthly` (antes iba a `/dashboard/upgrade`). Razón: cuando el usuario ya está mirando el paywall por límite alcanzado, llevarlo a otra página de comparación es fricción innecesaria — el botón promete checkout, así que abre checkout.
+- El banner del dashboard y la plan card de settings **se mantienen** apuntando a `/dashboard/upgrade` (intencional: esos accesos son menos urgentes y conviene que el usuario vea la comparación de planes antes de pagar).
+
+**Success state al volver del checkout**
+- Nuevo `src/components/dashboard/upgrade-success-toast.tsx` (`"use client"`):
+  - Lee `useSearchParams()` y dispara `toast.success("Welcome to Pro! 🎉 Your upgrade is active. Enjoy unlimited tracking.", { duration: 6000 })` cuando detecta `?upgraded=true`.
+  - Un `useRef(firedRef)` evita re-disparos en re-renders.
+  - Después del toast, `router.replace()` limpia el param `upgraded` de la URL sin reload (`scroll: false`).
+- Montado en `src/app/(dashboard)/dashboard/page.tsx` dentro de `<Suspense fallback={null}>` (requerido por Next 16 para `useSearchParams` en componentes que podrían sufrir bail-out de static rendering).
+- Importante: hay un gap natural entre "vuelves del checkout" y "tu plan está actualizado en la DB" porque el webhook procesa asíncronamente. El toast confirma que la transacción fue exitosa según LemonSqueezy; el badge del sidebar puede tardar 1-3 segundos en reflejar el nuevo plan tras el siguiente render. No se hace polling — un refresh manual basta y mantiene la UX simple.
+
+**Botones que no cambian (intencional)**
+- **Landing pricing cards**: se mantienen como "Join the waitlist" porque el registro sigue cerrado. Cuando el registro abra al público, se ajustan en su propio día.
+- **Sidebar / mobile nav "Upgrade" item**: sigue navegando a `/dashboard/upgrade` (ahí están las 3 opciones).
+- **Settings → Plan card "Upgrade to Pro"**: sigue a `/dashboard/upgrade`.
+- **Dashboard banner "Upgrade →"**: sigue a `/dashboard/upgrade`.
+
+**Env vars**
+- `.env.example` actualizado con `SUPABASE_SERVICE_ROLE_KEY` (server-only). La variable ya está presente en `.env.local` del owner; falta agregarla en Vercel Production.
+
+### Rutas tras Día 9
+
+```
+/api/checkout                          GET — auth + redirect a LemonSqueezy con user_id+email pre-llenados
+/api/webhooks/lemonsqueezy             POST — firma HMAC verificada + update users.plan según evento
+```
+(el resto de rutas sin cambios respecto a Día 8.)
+
+### Estructura nueva (Día 9)
+
+```
+src/
+├── app/api/
+│   ├── checkout/route.ts                    — NEW — redirige al checkout LemonSqueezy
+│   └── webhooks/lemonsqueezy/route.ts       — reescrito (verificación firma + switch eventos)
+├── components/
+│   ├── dashboard/upgrade-success-toast.tsx  — NEW — toast cuando ?upgraded=true
+│   ├── shared/upgrade-prompt.tsx            — link ahora va a /api/checkout?plan=pro_monthly
+│   └── upgrade/upgrade-cta-button.tsx       — rediseñado con prop `plan` + loading state
+└── lib/lemonsqueezy.ts                      — IDs reales + LEMON_STORE_ID + getCheckoutUrl()
+```
+
+### Calidad
+
+- `next build` → ✅ limpio, **25 rutas** (las 24 de Día 8 + `/api/checkout`), 0 errores.
+- TypeScript estricto: no se introdujeron `any`. El webhook event type ya soporta `first_order_item` opcional.
+- Sin nuevas dependencias.
+- El webhook usa `crypto` y `runtime = "nodejs"` (no edge) — `crypto.timingSafeEqual` y `Buffer` requieren el runtime de Node.
+
+### Decisiones / consideraciones
+
+- **Success URL hard-coded a `https://freeledger.dev/dashboard?upgraded=true`** — pedido explícito del prompt. Esto significa que un checkout disparado desde `localhost:3000` redirige a producción al terminar. Para testing local, una alternativa sería usar `${process.env.NEXT_PUBLIC_APP_URL}` pero requiere que la env exista y sea pública del lado server, y la decisión actual es preferir simplicidad de configuración. Si se quiere cambiar, es un one-liner en `getCheckoutUrl()`.
+- **`SUPABASE_SERVICE_ROLE_KEY` solo se lee en `src/app/api/webhooks/lemonsqueezy/route.ts`**. Si en algún momento se necesita el service role en otro server-only path, conviene moverlo a un módulo dedicado (`src/lib/supabase/admin.ts`) y nunca tocarlo desde código que pueda llegar al bundle del cliente. Nunca prefijar la variable con `NEXT_PUBLIC_`.
+- **`timingSafeEqual` con length check previo**: la documentación de Node.js es explícita en que `timingSafeEqual` **tira** si los buffers tienen longitudes distintas. Comparar lengths antes y retornar `false` cubre ese vector (atacante mandando una firma vacía/corta para tumbar el handler en vez de obtener `401`).
+- **`on_trial` cuenta como Pro**: si LemonSqueezy emite `subscription_created` con `status=on_trial` (caso de un cupón/trial), se sube a `plan='pro'`. Cuando expire el trial sin convertir, LS manda `subscription_expired` y baja a free.
+- **`order_created` se filtra a `variant_id === lifetime`**: el evento `order_created` también dispara con compras de Pro (que además generan un `subscription_created`). Solo nos interesa el lifetime aquí — el subscription event ya maneja el Pro mensual.
+- **El webhook actualmente no persiste `customer_id` ni `variant_id` en el row del user**. El plan original (Día 8) lo tenía como TODO. Se omitió en Día 9 porque la columna no existe en `users` y agregar el ALTER TABLE no estaba en el alcance. Si en algún momento se quiere abrir el customer portal de LemonSqueezy para autoservicio de cancelación, esto será necesario.
+- **`window.location.href` vs `router.push`**: para el checkout se usa la primera porque el target es un dominio externo (LemonSqueezy). `router.push` solo navega dentro de la app.
+
+### Pasos manuales pendientes (post-Día 9)
+
+1. **SQL en Supabase** — asegurar que el constraint de `users.plan` permite `lifetime`:
+   ```sql
+   ALTER TABLE users DROP CONSTRAINT IF EXISTS users_plan_check;
+   ALTER TABLE users ADD CONSTRAINT users_plan_check CHECK (plan IN ('free', 'pro', 'lifetime'));
+   ```
+   (Era el paso 1 pendiente de Día 8 — sigue pendiente. Sin esto, el webhook fallará silenciosamente al intentar setear `plan='lifetime'`.)
+2. **Vercel env vars** (Production + Preview):
+   - `SUPABASE_SERVICE_ROLE_KEY` — copiar de Supabase → Project Settings → API → `service_role` key (es la clave secreta, no la anon).
+   - `LEMON_SQUEEZY_API_KEY`, `LEMON_SQUEEZY_WEBHOOK_SECRET`, `LEMON_SQUEEZY_STORE_ID=366692` — si aún no están.
+   - `NEXT_PUBLIC_APP_URL=https://freeledger.dev` — confirmar.
+3. **LemonSqueezy webhook**: confirmar en LS Dashboard → Settings → Webhooks que el endpoint `https://freeledger.dev/api/webhooks/lemonsqueezy` está activo, suscrito al menos a `subscription_created`, `subscription_updated`, `subscription_cancelled`, `subscription_expired`, `order_created`, y que el "Signing secret" coincide con `LEMON_SQUEEZY_WEBHOOK_SECRET` en Vercel.
+4. **Test mode end-to-end** (post-deploy):
+   - Activar test mode en LemonSqueezy (toggle arriba a la derecha del dashboard).
+   - Loguearse en `https://freeledger.dev`, ir a `/dashboard/upgrade`, click en "Upgrade to Pro — $9/mo". Pagar con `4242 4242 4242 4242`.
+   - Tras el checkout: verificar que vuelves a `/dashboard?upgraded=true`, que el toast aparece, y que `users.plan` cambió a `pro` en Supabase (puede tardar 1-3s).
+   - Repetir con Lifetime para verificar el path de `order_created`.
+   - Probar `Send test event` desde LemonSqueezy → debe responder `200 { received: true }`. Cambiar el signing secret en LS y reenviar → `401 Invalid signature`.
+5. **(Opcional) Postlaunch cleanup**:
+   - Bloquear CSV export para Free (`PLANS.free.canExportCSV = false` + guard server-side).
+   - Persistir `lemon_customer_id` y `lemon_variant_id` en `users` para abrir el customer portal de LS.
+
+---
+
+## 🧪 Cómo probar Día 9 localmente
+
+Pre-requisito: tener `SUPABASE_SERVICE_ROLE_KEY` en `.env.local` (ya está). Test mode de LemonSqueezy activado.
+
+### Checkout
+1. `npm run dev` → loguearse → `/dashboard/upgrade`.
+2. Click en "Upgrade to Pro — $9/mo" → el botón muestra spinner + "Redirecting…" → te lleva a `https://freeledger.lemonsqueezy.com/buy/1634640?...` con email pre-rellenado.
+3. Confirmar visualmente que en la URL hay `checkout[custom][user_id]=<uuid>` y `checkout[email]=<tu email>`. Si la URL no contiene el `user_id`, el webhook nunca podrá vincular el pago al usuario correcto.
+4. Pagar con `4242 4242 4242 4242` (test mode). La redirección de éxito te lleva a `https://freeledger.dev/dashboard?upgraded=true` — para ver el toast en local, manualmente copia el path y abre `http://localhost:3000/dashboard?upgraded=true`. Aparece el toast verde y la URL se limpia a `/dashboard`.
+5. Repetir con "Get Lifetime $69" (variant 1634662) — mismo flujo pero el evento que dispara la actualización en el webhook es `order_created`.
+
+### Webhook (localmente con ngrok, opcional)
+1. `ngrok http 3000` → copiar la URL pública.
+2. En LemonSqueezy → Webhooks → cambiar temporalmente el endpoint al de ngrok (`<ngrok>/api/webhooks/lemonsqueezy`).
+3. En el dashboard de LS, abrir el webhook y click en "Send test event" → escoger `subscription_created`. Debe responder `200`.
+4. Modificar el `LEMON_SQUEEZY_WEBHOOK_SECRET` en `.env.local` y volver a enviar → debe responder `401 Invalid signature`. Restaurar el valor real.
+5. Restaurar el endpoint en LS al de producción cuando termines.
+
+### Estados de error
+1. **Sesión expirada**: cerrar sesión y abrir directamente `http://localhost:3000/api/checkout?plan=pro_monthly` → redirige a `/login?next=/dashboard/upgrade`.
+2. **Plan inválido**: `http://localhost:3000/api/checkout?plan=foo` → `400 { error: "Invalid plan" }`.
+3. **UpgradePrompt directo a checkout**: en `/dashboard/income` con límite alcanzado, click en "Add income" → se abre el paywall dialog → click en "Upgrade to Pro — $9/mo" → debe redirigirte directamente al checkout (no a `/dashboard/upgrade`).
+
+### Toast de éxito (sin checkout real)
+1. Loguearse y abrir manualmente `http://localhost:3000/dashboard?upgraded=true`.
+2. Debe aparecer el toast verde "Welcome to Pro! 🎉 Your upgrade is active. Enjoy unlimited tracking." (6 segundos de duración).
+3. Tras el toast la URL queda en `/dashboard` (param `upgraded` removido).
+4. Refrescar la página → el toast NO vuelve a aparecer (porque ya no está el param).
+
+---
+
 ## 📍 Comandos rápidos
 
 ```bash
 npm run dev            # http://localhost:3000
-npm run build          # production build (verificado Día 7: 22 rutas, 0 errores)
+npm run build          # production build (verificado Día 9: 25 rutas, 0 errores)
 npx tsc --noEmit       # typecheck (limpio)
-npm run lint           # eslint (4 errores pre-existentes, no introducidos en Día 7)
+npm run lint           # eslint (errores pre-existentes únicamente, no nuevos)
 ```
 
 ---

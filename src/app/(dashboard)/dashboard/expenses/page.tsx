@@ -1,7 +1,9 @@
 import { getMonthlyExpenses } from "@/lib/actions/expenses";
+import { getCurrentUserUsage } from "@/lib/actions/limits";
 import { getUserRecord } from "@/lib/actions/settings";
 import { ExpensesPageClient } from "@/components/expenses/expenses-page-client";
 import { parseMonthParams } from "@/lib/dates";
+import { PLANS } from "@/lib/plans";
 
 export const metadata = {
   title: "Expenses",
@@ -24,9 +26,10 @@ export default async function ExpensesPage({
   const sp = await searchParams;
   const range = parseMonthParams(sp);
 
-  const [expenses, userRecord] = await Promise.all([
+  const [expenses, userRecord, usage] = await Promise.all([
     getMonthlyExpenses(range.year, range.month),
     getUserRecord(),
+    getCurrentUserUsage(),
   ]);
 
   const initialCategory = readParam(sp, "category");
@@ -43,6 +46,10 @@ export default async function ExpensesPage({
   const initialDir = dirRaw === "asc" ? "asc" : "desc";
   const initialAction = readParam(sp, "action");
 
+  const plan = usage?.plan ?? "free";
+  const transactionLimit = PLANS[plan].maxTransactionsPerMonth;
+  const transactionsThisMonth = usage?.transactionsThisMonth ?? 0;
+
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
       <ExpensesPageClient
@@ -57,6 +64,9 @@ export default async function ExpensesPage({
         initialSort={initialSort}
         initialDir={initialDir}
         initialAction={initialAction}
+        plan={plan}
+        transactionsThisMonth={transactionsThisMonth}
+        transactionLimit={transactionLimit}
       />
     </div>
   );

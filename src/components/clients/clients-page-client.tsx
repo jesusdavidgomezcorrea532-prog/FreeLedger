@@ -5,8 +5,11 @@ import { Pencil, Plus, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ClientFormDialog } from "@/components/clients/client-form-dialog";
 import { DeleteConfirmDialog } from "@/components/clients/delete-confirm-dialog";
+import { UsageMeter } from "@/components/shared/usage-meter";
+import { UpgradePrompt } from "@/components/shared/upgrade-prompt";
 import { deleteClientAction } from "@/lib/actions/clients";
 import { formatDateShort } from "@/lib/dates";
+import type { PlanType } from "@/lib/plans";
 import type { ClientRecord } from "@/types";
 
 type Mode =
@@ -17,11 +20,30 @@ type Mode =
 
 type ClientsPageClientProps = {
   clients: ClientRecord[];
+  plan: PlanType;
+  clientLimit: number;
 };
 
-export function ClientsPageClient({ clients }: ClientsPageClientProps) {
+export function ClientsPageClient({
+  clients,
+  plan,
+  clientLimit,
+}: ClientsPageClientProps) {
   const [mode, setMode] = useState<Mode>({ kind: "closed" });
+  const [showPaywall, setShowPaywall] = useState(false);
   const close = () => setMode({ kind: "closed" });
+
+  const isFree = plan === "free";
+  const showMeter = isFree && Number.isFinite(clientLimit);
+  const limitReached = isFree && clients.length >= clientLimit;
+
+  const handleAdd = () => {
+    if (limitReached) {
+      setShowPaywall(true);
+      return;
+    }
+    setMode({ kind: "create" });
+  };
 
   return (
     <div className="space-y-6">
@@ -37,15 +59,25 @@ export function ClientsPageClient({ clients }: ClientsPageClientProps) {
         <Button
           type="button"
           data-shortcut-new
-          onClick={() => setMode({ kind: "create" })}
+          onClick={handleAdd}
+          disabled={limitReached}
+          title={limitReached ? "Limit reached — Upgrade to Pro" : undefined}
           className="bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
         >
           <Plus className="mr-1 h-4 w-4" /> Add client
         </Button>
       </div>
 
+      {showMeter && (
+        <UsageMeter
+          label="clients"
+          current={clients.length}
+          limit={clientLimit}
+        />
+      )}
+
       {clients.length === 0 ? (
-        <EmptyState onAdd={() => setMode({ kind: "create" })} />
+        <EmptyState onAdd={handleAdd} />
       ) : (
         <div className="overflow-hidden rounded-xl border border-zinc-200 dark:border-zinc-900 bg-white dark:bg-zinc-950">
           <ul className="divide-y divide-zinc-200 dark:divide-zinc-900">
@@ -124,6 +156,12 @@ export function ClientsPageClient({ clients }: ClientsPageClientProps) {
           if (mode.kind !== "delete") return { success: false, error: "Invalid state" };
           return deleteClientAction(mode.client.id);
         }}
+      />
+
+      <UpgradePrompt
+        open={showPaywall}
+        onOpenChange={setShowPaywall}
+        kind="clients"
       />
     </div>
   );

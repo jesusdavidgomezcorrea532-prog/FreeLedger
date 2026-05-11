@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { buildMonthRange } from "@/lib/dates";
+import { canCreateTransaction } from "@/lib/actions/limits";
 import type {
   ActionResult,
   ExpenseCategory,
@@ -115,6 +116,14 @@ export async function createExpenseAction(
   } = await supabase.auth.getUser();
   if (!user) {
     return { success: false, error: "Not authenticated." };
+  }
+
+  const limit = await canCreateTransaction(user.id);
+  if (!limit.allowed) {
+    return {
+      success: false,
+      error: `You've reached ${limit.limit} transactions this month on the Free plan. Upgrade to Pro for unlimited transactions.`,
+    };
   }
 
   const { data, error } = await supabase

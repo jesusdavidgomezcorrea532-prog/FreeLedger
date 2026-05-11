@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { CLIENT_COLORS } from "@/lib/constants";
+import { canCreateClient } from "@/lib/actions/limits";
 import type { ActionResult, ClientRecord } from "@/types";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -71,6 +72,14 @@ export async function createClientAction(
   } = await supabase.auth.getUser();
   if (!user) {
     return { success: false, error: "Not authenticated." };
+  }
+
+  const limit = await canCreateClient(user.id);
+  if (!limit.allowed) {
+    return {
+      success: false,
+      error: `You've reached the limit of ${limit.limit} clients on the Free plan. Upgrade to Pro for unlimited clients.`,
+    };
   }
 
   const { data, error } = await supabase

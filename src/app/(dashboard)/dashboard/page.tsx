@@ -1,4 +1,5 @@
 import dynamic from "next/dynamic";
+import { Suspense } from "react";
 import { MonthPicker } from "@/components/dashboard/month-picker";
 import { DashboardAlerts } from "@/components/dashboard/dashboard-alerts";
 import { EmptyDashboard } from "@/components/dashboard/empty-dashboard";
@@ -6,6 +7,8 @@ import { QuickActions } from "@/components/dashboard/quick-actions";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { SummaryCards } from "@/components/dashboard/summary-cards";
 import { ChartSkeleton } from "@/components/dashboard/skeletons";
+import { UpgradeBanner } from "@/components/dashboard/upgrade-banner";
+import { UpgradeSuccessToast } from "@/components/dashboard/upgrade-success-toast";
 
 const MonthlyTrendChart = dynamic(
   () =>
@@ -36,6 +39,7 @@ import {
   getRecentTransactions,
 } from "@/lib/actions/dashboard";
 import { getClients } from "@/lib/actions/clients";
+import { getCurrentUserUsage } from "@/lib/actions/limits";
 import { getUserRecord } from "@/lib/actions/settings";
 import { parseMonthParams } from "@/lib/dates";
 
@@ -59,6 +63,7 @@ export default async function DashboardPage({
     recentTransactions,
     userRecord,
     clients,
+    usage,
   ] = await Promise.all([
     getDashboardSummary(range.year, range.month),
     getIncomeByClient(range.year, range.month),
@@ -67,7 +72,10 @@ export default async function DashboardPage({
     getRecentTransactions(5),
     getUserRecord(),
     getClients(),
+    getCurrentUserUsage(),
   ]);
+
+  const isFree = (usage?.plan ?? "free") === "free";
 
   const currency = userRecord?.currency ?? "USD";
   const taxRate = userRecord?.tax_rate ?? 0;
@@ -85,10 +93,15 @@ export default async function DashboardPage({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <Suspense fallback={null}>
+        <UpgradeSuccessToast />
+      </Suspense>
       {!hasAnyData ? (
         <EmptyDashboard displayName={displayName} />
       ) : (
         <div className="space-y-6">
+          {isFree && <UpgradeBanner />}
+
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h1 className="font-heading text-xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-100">

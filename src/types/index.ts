@@ -8,7 +8,7 @@ export type ActionResult<T = void> =
   | { success: true; data?: T; message?: string }
   | { success: false; error: string };
 
-export type UserPlan = "free" | "pro";
+export type UserPlan = "free" | "pro" | "lifetime";
 
 export type UserRecord = {
   id: string;
