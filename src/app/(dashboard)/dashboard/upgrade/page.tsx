@@ -94,7 +94,7 @@ export default async function UpgradePage() {
             <Card
               key={tier.id}
               className={cn(
-                "relative flex flex-col border bg-white transition-shadow dark:bg-zinc-950",
+                "relative flex flex-col overflow-visible border bg-white transition-shadow dark:bg-zinc-950",
                 tier.highlight
                   ? "border-emerald-500/40 shadow-lg shadow-emerald-500/5 ring-1 ring-emerald-500/30 hover:shadow-emerald-500/10"
                   : "border-zinc-200 dark:border-zinc-900 hover:shadow-md",

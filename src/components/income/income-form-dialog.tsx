@@ -132,6 +132,9 @@ export function IncomeFormDialog({
               <Select
                 value={clientId}
                 onValueChange={(v) => v != null && setClientId(v)}
+                items={Object.fromEntries(
+                  clients.map((c) => [c.id, c.name]),
+                )}
               >
                 <SelectTrigger id="income-client" className="w-full">
                   <SelectValue placeholder="Select a client" />
