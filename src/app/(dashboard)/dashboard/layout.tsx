@@ -9,6 +9,12 @@ import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_COUNTRY } from "@/lib/constants";
 import { normalizePlan, PLANS } from "@/lib/plans";
 import { cn } from "@/lib/utils";
+import { APP_URL, FROM_EMAIL, resend } from "@/lib/resend";
+import {
+  welcomeEmailHtml,
+  welcomeEmailSubject,
+  welcomeEmailText,
+} from "@/lib/emails/welcome";
 
 export default async function DashboardSectionLayout({
   children,
@@ -27,7 +33,9 @@ export default async function DashboardSectionLayout({
   const [{ data: userRow }, { count: clientCount }] = await Promise.all([
     supabase
       .from("users")
-      .select("country, display_name, avatar_url, email, plan")
+      .select(
+        "country, display_name, avatar_url, email, plan, welcome_email_sent",
+      )
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -35,6 +43,38 @@ export default async function DashboardSectionLayout({
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id),
   ]);
+
+  if (userRow && userRow.welcome_email_sent === false) {
+    const recipient = userRow.email ?? user.email;
+    if (recipient) {
+      const name =
+        userRow.display_name ??
+        (user.user_metadata?.full_name as string | undefined) ??
+        (user.user_metadata?.name as string | undefined) ??
+        null;
+      try {
+        await resend.emails.send({
+          from: FROM_EMAIL,
+          to: recipient,
+          subject: welcomeEmailSubject(),
+          html: welcomeEmailHtml({
+            name,
+            dashboardUrl: `${APP_URL}/dashboard`,
+          }),
+          text: welcomeEmailText({
+            name,
+            dashboardUrl: `${APP_URL}/dashboard`,
+          }),
+        });
+        await supabase
+          .from("users")
+          .update({ welcome_email_sent: true })
+          .eq("id", user.id);
+      } catch (emailError) {
+        console.error("Welcome email failed:", emailError);
+      }
+    }
+  }
 
   const country = userRow?.country ?? DEFAULT_COUNTRY;
   const onboardingComplete = country !== DEFAULT_COUNTRY || (clientCount ?? 0) > 0;

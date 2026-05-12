@@ -18,15 +18,13 @@ export interface LemonSqueezyWebhookEvent {
 export const LEMON_STORE_ID = 366692;
 
 export const LEMON_VARIANTS = {
-  pro_monthly: 1640634,
-  lifetime: 1640642,
+  pro_monthly: 1634640,
+  lifetime: 1634662,
 } as const;
 
-// Checkout URLs from LemonSqueezy dashboard
-// TODO: Replace with Live Mode URLs before launch
 export const CHECKOUT_URLS = {
-  pro_monthly: 'https://freeledger.lemonsqueezy.com/checkout/buy/8a61de0b-766b-478b-86aa-528c301d8bd8',
-  lifetime: 'https://freeledger.lemonsqueezy.com/checkout/buy/a6b640b7-0a84-4230-bb92-c0e3eb93c77d',
+  pro_monthly: 'https://freeledger.lemonsqueezy.com/checkout/buy/ed08a4f9-0f2b-46ae-b1e9-7951d56ea2cb',
+  lifetime: 'https://freeledger.lemonsqueezy.com/checkout/buy/86b3bc33-3abe-4964-a90f-3bdfd1a32bb9',
 } as const;
 
 export type LemonVariant = keyof typeof LEMON_VARIANTS;

@@ -1,7 +1,7 @@
 # FreeLedger — Estado del proyecto
 
-> Snapshot al 11 de mayo de 2026 (fin del Día 9 — Activación real de pagos LemonSqueezy: webhook firmado, checkout server-side, botones cableados).
-> Stack: Next.js 16.2.4 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 · shadcn/ui · Supabase · Recharts · Sonner · lucide-react · next-themes.
+> Snapshot al 12 de mayo de 2026 (fin del Día 10 — Emails transaccionales con Resend: welcome, waitlist confirmation, upgrade confirmation. Checklist E2E manual creada).
+> Stack: Next.js 16.2.4 (App Router, Turbopack) · React 19 · TypeScript · Tailwind v4 · shadcn/ui · Supabase · Recharts · Resend · Sonner · lucide-react · next-themes.
 
 ---
 
@@ -1017,11 +1017,175 @@ Pre-requisito: tener `SUPABASE_SERVICE_ROLE_KEY` en `.env.local` (ya está). Tes
 
 ---
 
+## ✅ Día 10 — Emails con Resend + Testing E2E checklist (12 mayo 2026)
+
+### Lo que se hizo
+
+**Cliente Resend (lazy)**
+- `src/lib/resend.ts` (nuevo) — singleton lazy del cliente Resend. La construcción `new Resend(apiKey)` se difiere hasta el primer `send()` real porque durante `next build` el step "Collecting page data" evalúa los módulos importados con la env stripped, y un cliente instanciado al top-level con `apiKey === undefined` rompe el build. Patrón:
+  ```ts
+  let client: Resend | null = null;
+  function getClient() { if (!client) client = new Resend(process.env.RESEND_API_KEY!); return client; }
+  export const resend = { emails: { send: (p) => getClient().emails.send(p) } };
+  ```
+- Constantes exportadas: `FROM_EMAIL = "FreeLedger <noreply@freeledger.dev>"` (con comentario que indica el fallback `onboarding@resend.dev` mientras DNS no esté verificado) y `APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://freeledger.dev"`.
+- `.env.example` actualizado con `RESEND_API_KEY=re_xxxxxxxxxxxx` y comentario que apunta a `https://resend.com/api-keys` y advierte que sin DNS verificado Resend solo entrega al email de la cuenta.
+
+**Templates de email (HTML strings, sin React Email)**
+- Decisión: **no se instaló `@react-email/components`**. La regla 7 del prompt lo permitía, y los HTML strings simples con tablas dan máxima compatibilidad Gmail / Outlook / Apple Mail / Yahoo sin agregar dependencias. Cada template exporta `xxxSubject()`, `xxxHtml(params)` y `xxxText(params)` (versión texto plano para clientes que no renderizan HTML).
+- `src/lib/emails/components.ts` (nuevo) — building blocks reusables:
+  - `escapeHtml(value)` — escapa `& < > " '`.
+  - `emailLogo()` — "FreeLedger" en texto (no imagen).
+  - `emailButton(label, href)` — CTA con tabla + fondo emerald `#10b981`, padding 12/24, radius 8, texto blanco bold.
+  - `emailFooter()` — "You're receiving this because…" + link `freeledger.dev`.
+  - `emailLayout({ preheader, body })` — wrapper con doctype, `<meta x-apple-disable-message-reformatting>`, preheader oculto (`display:none; max-height:0; mso-hide:all`) y outer table 600px max-width con padding 32, border 1px y radius 12.
+  - Tipografía system stack: `-apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif`. Colores explícitos (hex) — los emails NO heredan Tailwind.
+- `src/lib/emails/welcome.ts` (nuevo) — subject `"Welcome to FreeLedger! 🎉"`. Saludo personalizado con el primer token del `display_name` (o `"there"` si null). Lista numerada de 3 pasos (add client / record income / check Real Money). CTA "Go to Dashboard" → `${APP_URL}/dashboard`. Firma "— Jesús, founder of FreeLedger".
+- `src/lib/emails/waitlist-confirmation.ts` (nuevo) — subject `"You're on the FreeLedger waitlist!"`. Body con agradecimiento + links a Twitter `@FreeLedgerApp` y `freeledger.dev`. Sin CTA button (intencional — el usuario aún no tiene cuenta).
+- `src/lib/emails/upgrade-confirmation.ts` (nuevo) — `UpgradePlan = "pro" | "lifetime"`. Subject según plan (`"Welcome to FreeLedger Pro! 🚀"` o `"Welcome to FreeLedger Lifetime! 🎉"`). Body con lista de 4 features desbloqueados. Si `plan === "lifetime"`, párrafo extra: `"You have lifetime access — no monthly fees, ever. Thank you for being one of the first 200!"`.
+
+**Wire-up: welcome email**
+- **Decisión arquitectónica importante**: el welcome email se envía **únicamente desde `src/app/(dashboard)/dashboard/layout.tsx`** (no desde `signUpWithPassword`), con detección de "primera visita" vía el campo `users.welcome_email_sent`. Razón: cubre con una sola fuente de verdad los dos paths de signup (email/password y Google OAuth) y elimina el riesgo de doble envío. Trade-off: los usuarios de password no reciben el welcome inmediatamente al hacer signup (reciben primero el "verify email" de Supabase), sino al hacer su primera visita al dashboard tras verificar — esto es deseable porque alinea el welcome con el momento en que realmente empiezan a usar el producto.
+- Implementación en `dashboard/layout.tsx`:
+  - Se añade `welcome_email_sent` a la lista de columnas leídas del row de `users`.
+  - Si `userRow.welcome_email_sent === false` y existe email, se envía el welcome (en `try/catch`, no bloquea el render) y se updatea `users.welcome_email_sent = true` con la misma sesión Supabase.
+  - El name se resuelve en cascada: `userRow.display_name` → `user.user_metadata.full_name` → `user.user_metadata.name` → `null`.
+
+**Wire-up: waitlist confirmation**
+- `src/lib/actions/waitlist.ts` modificado — después del `insert` exitoso en `waitlist`, envuelve `resend.emails.send(...)` en `try/catch` con `console.error("Waitlist email failed:", emailError)`. La inserción nunca se revierte si el email falla — el lead sigue capturado, solo perdemos la confirmación.
+- Se envía `html` + `text` para mejorar deliverability (los clientes que prefieren texto plano lo reciben sin tener que parsear HTML).
+
+**Wire-up: upgrade confirmation**
+- `src/app/api/webhooks/lemonsqueezy/route.ts` modificado — nuevo helper `sendUpgradeEmail(userId, plan)` que:
+  1. Lee `email, display_name` desde `users` via service-role client.
+  2. Envía el upgrade email correspondiente (Pro o Lifetime).
+  3. Captura cualquier error con `console.error("Upgrade email failed:", ...)` — el plan ya quedó actualizado en DB, el email es best-effort.
+- **Guard anti-duplicado**: el switch ahora hace `SELECT plan` antes del `UPDATE` y solo envía el email si la transición es **real** (free → pro, o no-lifetime → lifetime). Razón: LemonSqueezy emite `subscription_updated` en cada renovación mensual y en cambios menores (e.g. métodos de pago). Sin el guard, el usuario recibiría un "Welcome to Pro" cada mes.
+  ```ts
+  if (existing?.plan !== "pro" && existing?.plan !== "lifetime") {
+    await sendUpgradeEmail(userId, "pro");
+  }
+  ```
+- Para `order_created` (lifetime): el guard chequea `existing?.plan !== "lifetime"`.
+
+**Testing checklist E2E (manual)**
+- `TESTING_CHECKLIST.md` (nuevo, en root) — checklist exhaustivo en markdown con ~80 items agrupados por sección: Landing, Auth, Onboarding, Dashboard, Clients, Income, Expenses, Settings, Upgrade & Payments, Dark/Light Mode, Responsive, Performance, Emails.
+- La sección Emails verifica: llegada al inbox, render correcto en Gmail/Outlook/Apple Mail, nombre personalizado en el welcome, dispatch único (no doble), guard de transición en upgrade, y graceful degradation si Resend está caído.
+
+### Rutas tras Día 10
+
+Sin nuevas rutas. Los emails se disparan desde Server Actions (`joinWaitlist`), Server Components (`dashboard/layout.tsx`) y Route Handlers (`api/webhooks/lemonsqueezy`) ya existentes.
+
+### Estructura nueva (Día 10)
+
+```
+src/
+└── lib/
+    ├── resend.ts                                    — NEW — cliente lazy + FROM_EMAIL + APP_URL
+    └── emails/                                      — NEW directorio
+        ├── components.ts                            — emailLayout, emailButton, emailFooter, emailLogo, escapeHtml
+        ├── welcome.ts                               — subject + html + text
+        ├── waitlist-confirmation.ts                 — subject + html + text
+        └── upgrade-confirmation.ts                  — subject + html + text (Pro / Lifetime)
+
+TESTING_CHECKLIST.md                                 — NEW — checklist E2E manual con ~80 items
+```
+
+Archivos modificados:
+- `src/app/(dashboard)/dashboard/layout.tsx` — lee `welcome_email_sent`, envía welcome en primera visita, marca el flag.
+- `src/lib/actions/waitlist.ts` — envía confirmation tras insert exitoso.
+- `src/app/api/webhooks/lemonsqueezy/route.ts` — envía upgrade email con guard de transición.
+- `.env.example` — añade `RESEND_API_KEY`.
+
+### Calidad
+
+- `next build` → ✅ limpio, 25 rutas (sin cambios vs Día 9), 0 errores. **Verificado tras refactor lazy client** — el primer intento de build falló con `Missing API key. Pass it to the constructor` porque `new Resend(undefined)` se evaluaba al cargar el módulo durante page data collection; el patrón lazy lo arregla.
+- TypeScript estricto, sin `any`.
+- Sin nuevas dependencias (`resend` ya estaba instalado desde Día 1; `@react-email/components` descartado a propósito).
+- Los emails NO bloquean el flujo principal: cada send está en `try/catch` con `console.error`. Si Resend está caído o la API key es inválida, el waitlist insert / signup / plan update siguen funcionando.
+
+### Decisiones / consideraciones
+
+- **HTML strings vs React Email**: descartado `@react-email/components` para mantener el bundle ligero y evitar el overhead de renderizar JSX en runtime. Las tablas HTML son el formato más portable entre clientes de email (especialmente Outlook 2016+ que aún no soporta flex/grid de forma consistente).
+- **Welcome email solo desde dashboard layout**: ver decisión arquitectónica detallada arriba. Si en el futuro se quiere mover al Server Action de signup (e.g. para entregar el welcome antes de verificar el email), habría que también marcar `welcome_email_sent = true` ahí — pero conviene esperar a tener métricas reales de abridos.
+- **El layout lee `welcome_email_sent` con la sesión del usuario (anon key + RLS)**: esto funciona porque la RLS de `users` permite `SELECT/UPDATE` sobre `auth.uid() = id`. No necesita service-role.
+- **`escapeHtml` en el `name`**: el nombre del usuario viene del display_name (que el propio usuario controla) o de los metadata de OAuth — escapamos para evitar HTML injection en el inbox del usuario.
+- **Plain text version (`text`)**: los providers (Gmail, Outlook) usan la versión texto cuando el cliente del receptor no acepta HTML o cuando el usuario tiene "show plain text" forzado. Adicionalmente, tener `text` ayuda al spam score — un email solo-HTML es señal débil de spam.
+- **Preheader oculto**: el text dentro de `<div style="display:none">` aparece como preview en el inbox de Gmail/Apple Mail. Cada template define uno específico (e.g. `"Get started with FreeLedger in 3 quick steps."`).
+- **Sender `noreply@freeledger.dev` requiere DNS verificado**: hasta que el usuario configure SPF/DKIM/DMARC en Namecheap y verifique en Resend, los envíos a destinatarios distintos de la cuenta de Resend rebotarán. El comentario en `resend.ts` apunta al fallback `onboarding@resend.dev` (un sender compartido que Resend habilita por defecto y entrega a cualquier email).
+
+### Pasos manuales pendientes (post-Día 10)
+
+1. **Añadir `RESEND_API_KEY` a `.env.local`** — obtenerla en `https://resend.com/api-keys` (permiso "Sending access"). Sin esto, el primer `resend.emails.send(...)` lanza `Error: RESEND_API_KEY is not set` y queda capturado en el `try/catch` (silencioso para el usuario).
+2. **SQL en Supabase** — agregar la columna `welcome_email_sent`:
+   ```sql
+   ALTER TABLE users ADD COLUMN IF NOT EXISTS welcome_email_sent BOOLEAN DEFAULT false;
+   -- Opcional: marcar usuarios existentes como ya bienvenidos para evitar que reciban el email en su próxima visita
+   UPDATE users SET welcome_email_sent = true WHERE created_at < now();
+   ```
+3. **DNS en Namecheap** para `freeledger.dev` — los valores exactos los da Resend al añadir el dominio. Registros típicos:
+   - MX `send` → `feedback-smtp.us-east-1.amazonses.com` priority 10 (bounce/feedback).
+   - TXT `send` → `v=spf1 include:amazonses.com ~all` (SPF).
+   - TXT `resend._domainkey` → la cadena `p=MIG...` que Resend genera (DKIM).
+   - TXT `_dmarc` → `v=DMARC1; p=none;` (DMARC, recomendado).
+   - En Namecheap: Domain List → Manage → Advanced DNS → Add New Record. Host omite `.freeledger.dev` (Namecheap lo añade). TTL Automatic. Tras guardar, click "Verify DNS Records" en Resend (propagación 5 min – 1 h).
+4. **Vercel env vars** — `RESEND_API_KEY` también en Production + Preview.
+5. **Mientras DNS no esté verificado**: descomentar el fallback en `src/lib/resend.ts:30` (`FROM_EMAIL = "FreeLedger <onboarding@resend.dev>"`) para poder enviar a cualquier destinatario en testing.
+6. **Test end-to-end**:
+   - Waitlist: hacer signup con tu propio email (el de la cuenta de Resend, mientras DNS no esté listo) → verificar inbox + Resend Dashboard → Logs.
+   - Welcome: login fresh con cuenta nueva → visitar `/dashboard` → verificar email + que el campo `welcome_email_sent` quedó en `true` en Supabase.
+   - Upgrade: simular un webhook `order_created` con `variant_id=1634662` desde LS test mode → verificar email Lifetime + que el plan cambió a `lifetime` en DB.
+
+---
+
+## 🧪 Cómo probar Día 10 localmente
+
+Pre-requisito: `RESEND_API_KEY` en `.env.local` + (opcional pero recomendado) sender de fallback activado mientras DNS no esté listo. SQL del paso 2 ejecutado en Supabase.
+
+### Waitlist confirmation
+1. `npm run dev` → abrir landing page → scroll a sección Waitlist.
+2. Introducir un email (idealmente el mismo de tu cuenta Resend mientras DNS no esté verificado).
+3. Submit → toast verde `"You're on the list!"`.
+4. Verificar:
+   - Supabase → tabla `waitlist` → la fila nueva está ahí.
+   - Resend Dashboard → Logs → entrada con asunto `"You're on the FreeLedger waitlist!"`, status `Delivered`.
+   - Inbox: el correo llega en < 30s. Verificar render en Gmail (web y mobile) y Apple Mail.
+5. **Edge case fallo de Resend**: temporalmente poner una API key inválida en `.env.local`, reiniciar dev server, intentar otro email. La fila SÍ debe insertarse en `waitlist`. El terminal muestra `Waitlist email failed: ...`. El user recibe el toast verde igualmente (graceful degradation).
+
+### Welcome email
+1. Crear un usuario nuevo (signup con email/password O Google).
+2. Para password: verificar el email en el link de Supabase → llegar a `/dashboard`.
+3. Para Google: directamente cae en `/dashboard`.
+4. Tras el render del layout: verificar inbox → llega "Welcome to FreeLedger! 🎉".
+5. El saludo dice "Hi <primer nombre>," si el usuario tiene `display_name`, o "Hi there," si no.
+6. Refrescar `/dashboard` → el email NO se reenvía. Verificar en Supabase que `welcome_email_sent = true`.
+7. **Test de re-envío manual**: en Supabase, setear `welcome_email_sent = false` para tu user y volver a entrar a `/dashboard` → el email se vuelve a enviar.
+
+### Upgrade confirmation
+1. Activar test mode en LemonSqueezy.
+2. `/dashboard/upgrade` → "Upgrade to Pro — $9/mo" → pagar con `4242 4242 4242 4242`.
+3. Volver al dashboard. El webhook procesa async, así que esperar 2-3s.
+4. Verificar:
+   - Supabase → `users.plan = 'pro'`.
+   - Resend Logs → email "Welcome to FreeLedger Pro! 🚀" → Delivered.
+   - Inbox: el correo lista los 4 features desbloqueados (Unlimited clients/transactions, CSV export, Advanced filters) y el botón CTA "Go to Dashboard".
+5. **Test de no-duplicado**: forzar otro `subscription_updated` desde LS Dashboard → "Send test event" → verificar que **NO** llega un segundo email (el guard `existing?.plan !== "pro"` lo bloquea).
+6. Repetir con Lifetime — verificar que el body incluye el párrafo extra "You have lifetime access — no monthly fees, ever. Thank you for being one of the first 200!".
+
+### Compatibilidad email clients
+1. Gmail web (modo claro y oscuro) — verificar que el botón emerald se ve correctamente, que la tabla no se rompe, que el preheader aparece en la preview de la inbox list.
+2. Gmail iOS / Android app.
+3. Apple Mail (macOS / iOS).
+4. Outlook web — verificar especialmente el botón (Outlook a veces no respeta `border-radius`; nuestro CTA cae en un cuadrado con esquinas rectas pero sigue funcional).
+5. **Plain text fallback**: en cliente de email, ver "Show original" → confirmar que el text version es legible y tiene el link al dashboard.
+
+---
+
 ## 📍 Comandos rápidos
 
 ```bash
 npm run dev            # http://localhost:3000
-npm run build          # production build (verificado Día 9: 25 rutas, 0 errores)
+npm run build          # production build (verificado Día 10: 25 rutas, 0 errores)
 npx tsc --noEmit       # typecheck (limpio)
 npm run lint           # eslint (errores pre-existentes únicamente, no nuevos)
 ```

@@ -1,6 +1,12 @@
 "use server";
 
 import { createClient } from "@/lib/supabase/server";
+import { FROM_EMAIL, resend } from "@/lib/resend";
+import {
+  waitlistConfirmationHtml,
+  waitlistConfirmationSubject,
+  waitlistConfirmationText,
+} from "@/lib/emails/waitlist-confirmation";
 import type { ActionResult } from "@/types";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -38,6 +44,18 @@ export async function joinWaitlist(
       error: "Something went wrong. Please try again.",
       timestamp,
     };
+  }
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: email,
+      subject: waitlistConfirmationSubject(),
+      html: waitlistConfirmationHtml(),
+      text: waitlistConfirmationText(),
+    });
+  } catch (emailError) {
+    console.error("Waitlist email failed:", emailError);
   }
 
   return {
