@@ -14,23 +14,23 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "#09090b",
+          background: "#0B0B0D",
           borderRadius: 6,
         }}
       >
         <svg
-          width="22"
-          height="22"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#34d399"
-          strokeWidth={2.5}
-          strokeLinecap="round"
-          strokeLinejoin="round"
+          width="26"
+          height="26"
+          viewBox="0 0 240 240"
+          fill="#FFFFFF"
+          xmlns="http://www.w3.org/2000/svg"
         >
-          <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-          <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-          <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+          <polygon points="30,220 70,220 104,40 64,40" />
+          <polygon points="64,40 170,40 166.2,60 100.2,60" />
+          <polygon points="89,120 149,120 144.4,144 84.4,144" />
+          <polygon points="170,40 190,40 188.86,46 168.86,46" />
+          <polygon points="168.67,47 200.67,47 199.53,53 167.53,53" />
+          <polygon points="167.34,54 211.34,54 210.2,60 166.2,60" />
         </svg>
       </div>
     ),
