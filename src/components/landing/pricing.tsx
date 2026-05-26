@@ -27,8 +27,7 @@ const PLANS: Plan[] = [
       "Basic dashboard",
       "Light & dark mode",
     ],
-    cta: { label: "Join the waitlist", href: "#waitlist" },
-    badge: "Coming soon",
+    cta: { label: "Get started free", href: "/signup" },
   },
   {
     name: "Pro",
@@ -42,9 +41,8 @@ const PLANS: Plan[] = [
       "Tax reserve & smart alerts",
       "Monthly email reports",
     ],
-    cta: { label: "Join the waitlist", href: "#waitlist" },
+    cta: { label: "Start Pro — $9/mo", href: "/signup" },
     highlighted: true,
-    badge: "Coming soon",
   },
   {
     name: "Lifetime",
@@ -57,8 +55,7 @@ const PLANS: Plan[] = [
       "Founder access channel",
       "Limited to first 200 customers",
     ],
-    cta: { label: "Join the waitlist", href: "#waitlist" },
-    badge: "Coming soon",
+    cta: { label: "Get Lifetime — $69", href: "/signup" },
     note: "Only first 200",
   },
 ];

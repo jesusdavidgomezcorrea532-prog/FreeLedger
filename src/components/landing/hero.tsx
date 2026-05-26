@@ -1,4 +1,5 @@
-import { Sparkles } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, Sparkles } from "lucide-react";
 import { WaitlistForm } from "./waitlist-form";
 
 function DashboardMockup() {
@@ -82,12 +83,12 @@ export function Hero() {
 
       <div className="relative mx-auto max-w-6xl">
         <div className="mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1 text-xs text-emerald-300">
+          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1 text-xs text-emerald-400">
             <Sparkles className="h-3 w-3" />
-            <span>Launching May 2026</span>
+            <span>Now live — Try it free</span>
           </div>
 
-          <h1 className="mt-6 text-4xl font-semibold tracking-tight text-zinc-50 sm:text-6xl">
+          <h1 className="mt-6 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl">
             Know your{" "}
             <span className="bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">
               real money.
@@ -101,12 +102,22 @@ export function Hero() {
             <span className="text-zinc-800 dark:text-zinc-200">how much money do I actually have?</span>
           </p>
 
-          <div className="mt-10 flex justify-center">
+          <div className="mt-10 flex flex-col items-center gap-4">
+            <Link
+              href="/signup"
+              className="inline-flex h-12 items-center gap-2 rounded-lg bg-emerald-500 px-6 text-sm font-medium text-zinc-950 transition-colors hover:bg-emerald-400"
+            >
+              Get started free
+              <ArrowRight className="h-4 w-4" />
+            </Link>
+            <p className="text-xs text-zinc-500">
+              Or join the waitlist for updates:
+            </p>
             <WaitlistForm variant="hero" />
           </div>
 
           <p className="mt-4 text-xs text-zinc-500">
-            Free plan available at launch. No credit card required.
+            Free plan available. No credit card required.
           </p>
 
           <div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-500">
@@ -115,7 +126,7 @@ export function Hero() {
               <span className="h-5 w-5 rounded-full border border-zinc-200 bg-emerald-400/50 dark:border-zinc-900" />
               <span className="h-5 w-5 rounded-full border border-zinc-200 bg-emerald-300/60 dark:border-zinc-900" />
             </span>
-            <span>Trusted by 50+ freelancers on the waitlist</span>
+            <span>Trusted by freelancers around the world</span>
           </div>
         </div>
 

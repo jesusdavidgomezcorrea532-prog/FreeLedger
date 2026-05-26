@@ -62,18 +62,14 @@ export function Footer() {
             >
               Terms
             </Link>
-            <Link
-              href="/login"
-              className="text-zinc-600 transition-colors hover:text-emerald-400 dark:text-zinc-600"
-            >
-              Admin login
-            </Link>
           </nav>
 
           <div className="flex items-center gap-5">
             <Link
-              href="https://twitter.com/FreeLedgerApp"
-              aria-label="Twitter"
+              href="https://x.com/FreeLedgerDev"
+              aria-label="X (Twitter)"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-zinc-500 transition-colors hover:text-emerald-400"
             >
               <TwitterIcon className="h-4 w-4" />

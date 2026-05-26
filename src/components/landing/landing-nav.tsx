@@ -61,10 +61,16 @@ export function LandingNav() {
         <div className="hidden items-center gap-3 md:flex">
           <ThemeToggle size="sm" />
           <Link
-            href="#waitlist"
+            href="/login"
+            className="text-sm text-zinc-600 transition-colors hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100"
+          >
+            Sign in
+          </Link>
+          <Link
+            href="/signup"
             className="inline-flex h-9 items-center rounded-lg bg-emerald-500 px-4 text-sm font-medium text-zinc-950 transition-colors hover:bg-emerald-400"
           >
-            Join the waitlist
+            Get started free
           </Link>
         </div>
 
@@ -96,11 +102,18 @@ export function LandingNav() {
               </Link>
             ))}
             <Link
-              href="#waitlist"
+              href="/login"
               onClick={() => setMobileOpen(false)}
-              className="mt-2 inline-flex h-10 items-center justify-center rounded-lg bg-emerald-500 px-4 text-sm font-medium text-zinc-950 transition-colors hover:bg-emerald-400"
+              className="mt-2 rounded-md px-3 py-2 text-sm text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900"
             >
-              Join the waitlist
+              Sign in
+            </Link>
+            <Link
+              href="/signup"
+              onClick={() => setMobileOpen(false)}
+              className="mt-1 inline-flex h-10 items-center justify-center rounded-lg bg-emerald-500 px-4 text-sm font-medium text-zinc-950 transition-colors hover:bg-emerald-400"
+            >
+              Get started free
             </Link>
           </nav>
         </div>

@@ -31,17 +31,6 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </p>
         </div>
 
-        <div className="mt-6 rounded-md border border-zinc-200 bg-zinc-50 px-3 py-2 text-center text-xs text-zinc-600 dark:border-zinc-800 dark:bg-zinc-900/40 dark:text-zinc-400">
-          FreeLedger is in pre-launch. Looking to join?{" "}
-          <Link
-            href="/#waitlist"
-            className="text-emerald-500 underline-offset-4 hover:underline dark:text-emerald-400"
-          >
-            Get on the waitlist
-          </Link>
-          .
-        </div>
-
         {errorParam && (
           <div className="mt-6 rounded-md border border-red-500/20 bg-red-500/10 px-3 py-2 text-sm text-red-300">
             We couldn&apos;t sign you in. Please try again.
@@ -62,12 +51,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
 
         <p className="mt-8 text-center text-xs text-zinc-500">
-          Not on the team yet?{" "}
+          Don&apos;t have an account?{" "}
           <Link
-            href="/#waitlist"
+            href="/signup"
             className="text-zinc-600 underline-offset-4 hover:text-emerald-400 hover:underline dark:text-zinc-400"
           >
-            Join the waitlist
+            Get started free
           </Link>
         </p>
       </div>
