@@ -90,7 +90,7 @@ export function Hero() {
 
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl">
             Know your{" "}
-            <span className="bg-gradient-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-emerald-400 to-green-300 bg-clip-text text-transparent">
               real money.
             </span>
           </h1>
