@@ -1,6 +1,5 @@
 import Link from "next/link";
 import { ArrowRight, Sparkles } from "lucide-react";
-import { WaitlistForm } from "./waitlist-form";
 
 function DashboardMockup() {
   return (
@@ -85,7 +84,7 @@ export function Hero() {
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/5 px-3 py-1 text-xs text-emerald-400">
             <Sparkles className="h-3 w-3" />
-            <span>Now live — Try it free</span>
+            <span>Free forever</span>
           </div>
 
           <h1 className="mt-6 text-4xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50 sm:text-6xl">
@@ -102,25 +101,20 @@ export function Hero() {
             <span className="text-zinc-800 dark:text-zinc-200">how much money do I actually have?</span>
           </p>
 
-          <div className="mt-10 flex flex-col items-center gap-4">
+          <div className="mt-10 flex flex-col items-center gap-3">
             <Link
               href="/signup"
-              className="inline-flex h-12 items-center gap-2 rounded-lg bg-emerald-500 px-6 text-sm font-medium text-zinc-950 transition-colors hover:bg-emerald-400"
+              className="inline-flex h-12 items-center gap-2 rounded-lg bg-emerald-500 px-7 text-sm font-medium text-zinc-950 transition-colors hover:bg-emerald-400"
             >
               Get started free
               <ArrowRight className="h-4 w-4" />
             </Link>
             <p className="text-xs text-zinc-500">
-              Or join the waitlist for updates:
+              Free forever. No credit card required.
             </p>
-            <WaitlistForm variant="hero" />
           </div>
 
-          <p className="mt-4 text-xs text-zinc-500">
-            Free plan available. No credit card required.
-          </p>
-
-          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-zinc-500">
+          <div className="mt-8 flex items-center justify-center gap-2 text-xs text-zinc-500">
             <span className="flex -space-x-1.5">
               <span className="h-5 w-5 rounded-full border border-zinc-200 bg-emerald-500/40 dark:border-zinc-900" />
               <span className="h-5 w-5 rounded-full border border-zinc-200 bg-emerald-400/50 dark:border-zinc-900" />
