@@ -51,6 +51,12 @@ export function Footer() {
 
           <nav className="flex items-center gap-5 text-xs text-zinc-500">
             <Link
+              href="/blog"
+              className="transition-colors hover:text-emerald-400"
+            >
+              Blog
+            </Link>
+            <Link
               href="/privacy"
               className="transition-colors hover:text-emerald-400"
             >

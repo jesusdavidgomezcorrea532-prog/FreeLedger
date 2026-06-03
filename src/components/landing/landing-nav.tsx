@@ -8,8 +8,9 @@ import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { cn } from "@/lib/utils";
 
 const NAV_LINKS = [
-  { label: "Features", href: "#features" },
-  { label: "Pricing", href: "#pricing" },
+  { label: "Features", href: "/#features" },
+  { label: "Pricing", href: "/#pricing" },
+  { label: "Blog", href: "/blog" },
 ];
 
 export function LandingNav() {

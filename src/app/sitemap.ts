@@ -1,9 +1,17 @@
 import type { MetadataRoute } from "next";
+import { getAllPosts } from "@/lib/blog";
 
 const BASE_URL = "https://freeledger.dev";
 
 export default function sitemap(): MetadataRoute.Sitemap {
   const lastModified = new Date();
+
+  const blogPosts: MetadataRoute.Sitemap = getAllPosts().map((post) => ({
+    url: `${BASE_URL}/blog/${post.slug}`,
+    lastModified: new Date(post.date),
+    changeFrequency: "monthly",
+    priority: 0.7,
+  }));
 
   return [
     {
@@ -12,6 +20,13 @@ export default function sitemap(): MetadataRoute.Sitemap {
       changeFrequency: "weekly",
       priority: 1,
     },
+    {
+      url: `${BASE_URL}/blog`,
+      lastModified,
+      changeFrequency: "weekly",
+      priority: 0.8,
+    },
+    ...blogPosts,
     {
       url: `${BASE_URL}/login`,
       lastModified,
