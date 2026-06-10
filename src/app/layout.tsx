@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "https://freeledger.dev";
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),

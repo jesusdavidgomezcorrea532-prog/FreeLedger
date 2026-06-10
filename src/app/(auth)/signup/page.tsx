@@ -1,8 +1,16 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/shared/logo";
 import { Separator } from "@/components/ui/separator";
 import { GoogleButton } from "@/components/auth/google-button";
 import { SignupForm } from "@/components/auth/signup-form";
+
+export const metadata: Metadata = {
+  title: "Sign up",
+  description:
+    "Create your free FreeLedger account and start tracking your real money.",
+  alternates: { canonical: "/signup" },
+};
 
 export default function SignupPage() {
   return (

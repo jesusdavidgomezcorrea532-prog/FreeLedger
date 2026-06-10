@@ -1,8 +1,15 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Logo } from "@/components/shared/logo";
 import { Separator } from "@/components/ui/separator";
 import { GoogleButton } from "@/components/auth/google-button";
 import { LoginForm } from "@/components/auth/login-form";
+
+export const metadata: Metadata = {
+  title: "Log in",
+  description: "Sign in to your FreeLedger account.",
+  alternates: { canonical: "/login" },
+};
 
 type LoginPageProps = {
   searchParams: Promise<{ next?: string; error?: string }>;

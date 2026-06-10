@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Hero } from "@/components/landing/hero";
@@ -7,6 +8,10 @@ import { Pricing } from "@/components/landing/pricing";
 import { Footer } from "@/components/landing/footer";
 import { LandingNav } from "@/components/landing/landing-nav";
 import { AnimateOnScroll } from "@/components/shared/animate-on-scroll";
+
+export const metadata: Metadata = {
+  alternates: { canonical: "/" },
+};
 
 function FinalCTA() {
   return (
