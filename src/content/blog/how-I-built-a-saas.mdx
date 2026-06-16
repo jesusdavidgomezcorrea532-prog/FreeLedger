@@ -1,0 +1,114 @@
+---
+title: "How I Built a Finance SaaS in 28 Days as a Solo Founder"
+description: "The complete story of building FreeLedger from idea to launch in 28 days. Stack, costs, decisions, mistakes, and lessons learned."
+date: "2026-06-15"
+author: "Jesús Gómez"
+tags: ["buildinpublic", "saas", "startup", "technical", "journey"]
+image: "/blog/built-saas-28-days.png"
+---
+
+## From Idea to Production in 28 Days
+
+On April 28, 2026, I had an idea. On May 25, 2026, FreeLedger was live in production with real users.
+
+Here's the complete, unfiltered story of how I built a finance SaaS as a solo founder — including the mistakes, the costs, and what I'd do differently.
+
+## The Idea
+
+I was researching the freelancer market and noticed something: every finance app is built for either companies or salaried employees. QuickBooks charges $30/month and has features no solo freelancer needs. YNAB is great for budgeting but doesn't understand irregular income. Wave is free but only works in the US and Canada.
+
+None of them answer the freelancer's core question: "After taxes and expenses, how much money is actually mine?"
+
+That gap became FreeLedger.
+
+## The Stack
+
+I chose tools that were free to start and could scale later:
+
+| Tool | Purpose | Cost |
+|------|---------|------|
+| Next.js 16 | Frontend + backend | Free |
+| Supabase | Database + auth | Free tier |
+| Tailwind + shadcn/ui | Styling | Free |
+| Recharts | Dashboard charts | Free |
+| Vercel | Hosting | Free tier |
+| Resend | Transactional email | Free tier |
+| LemonSqueezy | Payments | 5% per transaction |
+| Namecheap | Domain (freeledger.dev) | $12/year |
+
+**Total monthly cost: ~$1**
+
+## The Timeline
+
+### Week 1: Foundation
+- Day 1: Bought domain, created accounts (GitHub, Vercel, Supabase)
+- Day 2: Next.js setup + landing page with waitlist
+- Day 3: Authentication (email + Google OAuth)
+- Day 4: Database schema + CRUD for clients, income, expenses
+
+### Week 2: Core Features
+- Day 5: Real Money Dashboard with charts (the main feature)
+- Day 6: CSV export + advanced filters + dark/light mode
+- Day 7: Polish — SEO, OG images, legal pages, loading states
+
+### Week 3: Monetization
+- Day 8: Free tier limits + upgrade flow
+- Day 9: LemonSqueezy integration (payments)
+- Day 10: Email notifications with Resend
+
+### Week 4: Launch Prep
+- Days 11-14: Testing, bug fixes, content creation
+- Day 15: Product Hunt launch
+
+## The Costs
+
+Total money spent in 28 days:
+
+- Domain: $12
+- Hosting/DB/Email: $0 (free tiers)
+- Design: $0 (shadcn/ui + Tailwind)
+- Marketing: $0 (organic only)
+- Payment processing: $0 (no sales yet)
+- **Total: $12**
+
+Total time invested: ~60 hours over 28 days (~2 hours/day average).
+
+## The Mistakes
+
+### Mistake 1: Product Hunt Expectations
+I expected Product Hunt to be a game-changer. I finished at #205 with a handful of upvotes. The lesson: PH is one channel, and for a B2C product targeting freelancers, it's probably not the best one.
+
+### Mistake 2: Building Before Validating
+I spent 28 days building before getting real feedback from freelancers. In hindsight, I should have spent the first week talking to 20 freelancers about their financial pain points, then built based on what they told me.
+
+### Mistake 3: Overcomplicating the MVP
+The dashboard has charts, filters, sorting, keyboard shortcuts, dark mode. Most of these could have waited. The MVP should have been even simpler: just the four numbers (income, expenses, tax reserve, real money).
+
+## The Lessons
+
+### 1. Free tiers are incredibly generous in 2026
+You can build and launch a full SaaS for literally $12. The tools available today are mind-blowing.
+
+### 2. SEO beats launches
+A blog post that ranks on Google brings you traffic every single day. A Product Hunt launch brings traffic for 24 hours. Write blog posts.
+
+### 3. Communities beat marketing
+Genuine participation in Facebook groups and Reddit communities generates more signups than any marketing tactic.
+
+### 4. Ship fast, iterate faster
+28 days from idea to launch. Some features aren't perfect. That's okay. Real user feedback is worth more than another week of polish.
+
+## What's Next
+
+FreeLedger is live and growing. The roadmap includes:
+- Bank syncing (auto-import transactions)
+- Receipt scanning with AI
+- Mobile app (Flutter)
+- Multi-currency support
+- Weekly email reports
+
+If you're a freelancer and you want to know your real money, give it a try. It's free.
+
+[Try FreeLedger →](https://freeledger.dev)
+
+And if you're thinking about building your own SaaS — just start. The tools are free, the knowledge is accessible, and the worst that happens is you learn a ton.
